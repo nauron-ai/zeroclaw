@@ -1224,6 +1224,7 @@ pub(super) fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) 
     let mut text_parts = Vec::new();
     let mut calls = Vec::new();
     let mut remaining = response;
+    let mut malformed_tool_call_payloads = 0usize;
 
     // First, try to parse as OpenAI-style JSON response with tool_calls array
     // This handles providers like Minimax that return tool_calls in native JSON format
@@ -1289,9 +1290,7 @@ pub(super) fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) 
             }
 
             if !parsed_any {
-                tracing::warn!(
-                    "Malformed <tool_call>: expected tool-call object in tag body (JSON/XML/GLM)"
-                );
+                malformed_tool_call_payloads += 1;
             }
 
             remaining = &after_open[close_idx + close_tag.len()..];
@@ -1373,6 +1372,7 @@ pub(super) fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) 
                 continue;
             }
 
+            malformed_tool_call_payloads += 1;
             remaining = &remaining[start..];
             break;
         }
@@ -1638,6 +1638,13 @@ pub(super) fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) 
     // Remaining text after last tool call
     if !remaining.trim().is_empty() {
         text_parts.push(remaining.trim().to_string());
+    }
+
+    if malformed_tool_call_payloads > 0 {
+        tracing::warn!(
+            malformed_tool_call_payloads,
+            "Malformed <tool_call> payload(s): expected JSON/XML/GLM body"
+        );
     }
 
     (text_parts.join("\n"), calls)

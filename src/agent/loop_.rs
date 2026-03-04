@@ -348,6 +348,7 @@ const AUTO_CRON_DELIVERY_CHANNELS: &[&str] = &[
 const NON_CLI_APPROVAL_WAIT_TIMEOUT_SECS: u64 = 300;
 const NON_CLI_APPROVAL_POLL_INTERVAL_MS: u64 = 250;
 const MISSING_TOOL_CALL_RETRY_PROMPT: &str = "Internal correction: your last reply indicated you were about to take an action, but no valid tool call was emitted. If a tool is needed, emit it now using the required <tool_call>...</tool_call> format. If no tool is needed, provide the complete final answer now and do not defer action.";
+const MALFORMED_TOOL_CALL_FALLBACK_MESSAGE: &str = "I couldn't safely parse the tool-call payload from the model response. Please retry your request.";
 
 #[derive(Debug, Clone)]
 pub(crate) struct NonCliApprovalPrompt {
@@ -1203,6 +1204,7 @@ pub async fn run_tool_call_loop(
     let mut seen_tool_signatures: HashSet<(String, String)> = HashSet::new();
     let mut missing_tool_call_retry_used = false;
     let mut missing_tool_call_retry_prompt: Option<String> = None;
+    let mut parse_issue_count = 0usize;
     let ld_config = LOOP_DETECTION_CONFIG
         .try_with(Clone::clone)
         .unwrap_or_default();
@@ -1749,6 +1751,7 @@ pub async fn run_tool_call_loop(
                     ));
                 }
                 if let Some(parse_issue) = parse_issue.as_deref() {
+                    parse_issue_count += 1;
                     runtime_trace::record_event(
                         "tool_call_parse_issue",
                         Some(channel_name),
@@ -1759,6 +1762,7 @@ pub async fn run_tool_call_loop(
                         Some(parse_issue),
                         serde_json::json!({
                             "iteration": iteration + 1,
+                            "parse_issue_count": parse_issue_count,
                             "invalid_native_tool_json_count": invalid_native_tool_json_count,
                             "response_excerpt": truncate_with_ellipsis(
                                 &redact_trace_text(&response_text),
@@ -1938,6 +1942,33 @@ pub async fn run_tool_call_loop(
                 }
 
                 continue;
+            }
+
+            if parse_issue_detected {
+                runtime_trace::record_event(
+                    "tool_call_parse_recovery_failed_hard_fallback",
+                    Some(channel_name),
+                    Some(provider_name),
+                    Some(active_model.as_str()),
+                    Some(&turn_id),
+                    Some(false),
+                    Some("malformed tool-call payload without recoverable retry path"),
+                    serde_json::json!({
+                        "iteration": iteration + 1,
+                        "parse_issue_count": parse_issue_count,
+                        "response_excerpt": truncate_with_ellipsis(&redact_trace_text(&display_text), 600),
+                    }),
+                );
+                if let Some(ref tx) = on_delta {
+                    let _ = tx.send(DRAFT_CLEAR_SENTINEL.to_string()).await;
+                    let _ = tx
+                        .send(MALFORMED_TOOL_CALL_FALLBACK_MESSAGE.to_string())
+                        .await;
+                }
+                history.push(ChatMessage::assistant(
+                    MALFORMED_TOOL_CALL_FALLBACK_MESSAGE.to_string(),
+                ));
+                return Ok(MALFORMED_TOOL_CALL_FALLBACK_MESSAGE.to_string());
             }
 
             if missing_tool_call_retry_used && !tool_specs.is_empty() && missing_tool_call_signal {
@@ -5283,6 +5314,54 @@ mod tests {
             invocations.load(Ordering::SeqCst),
             0,
             "tool should not execute when model never emits a tool call"
+        );
+    }
+
+    #[tokio::test]
+    async fn run_tool_call_loop_uses_hard_fallback_after_malformed_tool_call_retry_fails() {
+        let provider = ScriptedProvider::from_text_responses(vec![
+            r#"<tool_call>{"name":"count_tool","arguments":{"value":"broken"}</tool_call>"#,
+            r#"<tool_call>{"name":"count_tool","arguments":{"value":"still-broken"}</tool_call>"#,
+        ]);
+
+        let invocations = Arc::new(AtomicUsize::new(0));
+        let tools_registry: Vec<Box<dyn Tool>> = vec![Box::new(CountingTool::new(
+            "count_tool",
+            Arc::clone(&invocations),
+        ))];
+
+        let mut history = vec![
+            ChatMessage::system("test-system"),
+            ChatMessage::user("please check the workspace"),
+        ];
+        let observer = NoopObserver;
+
+        let result = run_tool_call_loop(
+            &provider,
+            &mut history,
+            &tools_registry,
+            &observer,
+            "mock-provider",
+            "mock-model",
+            0.0,
+            true,
+            None,
+            "cli",
+            &crate::config::MultimodalConfig::default(),
+            5,
+            None,
+            None,
+            None,
+            &[],
+        )
+        .await
+        .expect("malformed payload should end with deterministic fallback");
+
+        assert_eq!(result, MALFORMED_TOOL_CALL_FALLBACK_MESSAGE);
+        assert_eq!(
+            invocations.load(Ordering::SeqCst),
+            0,
+            "tool should not execute when malformed payload never recovers"
         );
     }
 
