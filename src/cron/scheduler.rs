@@ -316,16 +316,37 @@ async fn deliver_if_configured(config: &Config, job: &CronJob, output: &str) -> 
         .as_deref()
         .ok_or_else(|| anyhow::anyhow!("delivery.to is required for announce mode"))?;
 
-    deliver_announcement(config, channel, target, output).await
+    let strict_live_whatsapp_web = channel.eq_ignore_ascii_case("whatsapp_web");
+    deliver_message(
+        config,
+        channel,
+        target,
+        output,
+        &DeliveryRequestOptions {
+            daemon_first: true,
+            strict_live_whatsapp_web,
+            ..DeliveryRequestOptions::default()
+        },
+    )
+    .await
 }
 
-pub(crate) async fn deliver_announcement(
+#[derive(Debug, Clone, Default)]
+pub(crate) struct DeliveryRequestOptions {
+    pub thread: Option<String>,
+    pub daemon_first: bool,
+    pub strict_live_whatsapp_web: bool,
+}
+
+pub(crate) async fn deliver_message(
     config: &Config,
     channel: &str,
     target: &str,
     output: &str,
+    options: &DeliveryRequestOptions,
 ) -> Result<()> {
     let normalized = channel.to_ascii_lowercase();
+    let outbound = SendMessage::new(output, target).in_thread(options.thread.clone());
     match normalized.as_str() {
         "telegram" => {
             let tg = config
@@ -340,7 +361,7 @@ pub(crate) async fn deliver_announcement(
                 tg.ack_enabled,
             )
             .with_workspace_dir(config.workspace_dir.clone());
-            channel.send(&SendMessage::new(output, target)).await?;
+            channel.send(&outbound).await?;
         }
         "discord" => {
             let dc = config
@@ -356,7 +377,7 @@ pub(crate) async fn deliver_announcement(
                 dc.mention_only,
             )
             .with_workspace_dir(config.workspace_dir.clone());
-            channel.send(&SendMessage::new(output, target)).await?;
+            channel.send(&outbound).await?;
         }
         "slack" => {
             let sl = config
@@ -371,7 +392,7 @@ pub(crate) async fn deliver_announcement(
                 sl.channel_ids.clone(),
                 sl.allowed_users.clone(),
             );
-            channel.send(&SendMessage::new(output, target)).await?;
+            channel.send(&outbound).await?;
         }
         "mattermost" => {
             let mm = config
@@ -387,7 +408,7 @@ pub(crate) async fn deliver_announcement(
                 mm.thread_replies.unwrap_or(true),
                 mm.mention_only.unwrap_or(false),
             );
-            channel.send(&SendMessage::new(output, target)).await?;
+            channel.send(&outbound).await?;
         }
         "dingtalk" => {
             let dt = config
@@ -400,7 +421,7 @@ pub(crate) async fn deliver_announcement(
                 dt.client_secret.clone(),
                 dt.allowed_users.clone(),
             );
-            channel.send(&SendMessage::new(output, target)).await?;
+            channel.send(&outbound).await?;
         }
         "qq" => {
             let qq = config
@@ -414,7 +435,7 @@ pub(crate) async fn deliver_announcement(
                 qq.allowed_users.clone(),
                 qq.environment.clone(),
             );
-            channel.send(&SendMessage::new(output, target)).await?;
+            channel.send(&outbound).await?;
         }
         "napcat" => {
             let napcat_cfg = config
@@ -423,7 +444,7 @@ pub(crate) async fn deliver_announcement(
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("napcat channel not configured"))?;
             let channel = NapcatChannel::from_config(napcat_cfg.clone())?;
-            channel.send(&SendMessage::new(output, target)).await?;
+            channel.send(&outbound).await?;
         }
         "whatsapp_web" | "whatsapp" => {
             let wa = config
@@ -432,18 +453,26 @@ pub(crate) async fn deliver_announcement(
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("whatsapp channel not configured"))?;
 
-            // WhatsApp Web requires the connected channel instance from the
-            // channel runtime. Fall back to cloud mode if configured.
-            if let Some(live_channel) = crate::channels::get_live_channel("whatsapp") {
-                live_channel.send(&SendMessage::new(output, target)).await?;
-            } else if wa.is_cloud_config() {
+            if options.daemon_first {
+                if let Some(live_channel) = crate::channels::get_live_channel("whatsapp") {
+                    live_channel.send(&outbound).await?;
+                    return Ok(());
+                }
+                if options.strict_live_whatsapp_web {
+                    anyhow::bail!(
+                        "whatsapp_web delivery requires an active channels runtime session; start daemon/channels with whatsapp web enabled"
+                    );
+                }
+            }
+
+            if wa.is_cloud_config() {
                 let channel = WhatsAppChannel::new(
                     wa.access_token.clone().unwrap_or_default(),
                     wa.phone_number_id.clone().unwrap_or_default(),
                     wa.verify_token.clone().unwrap_or_default(),
                     wa.allowed_numbers.clone(),
                 );
-                channel.send(&SendMessage::new(output, target)).await?;
+                channel.send(&outbound).await?;
             } else {
                 anyhow::bail!(
                     "whatsapp_web delivery requires an active channels runtime session; start daemon/channels with whatsapp web enabled"
@@ -459,7 +488,7 @@ pub(crate) async fn deliver_announcement(
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("lark channel not configured"))?;
                 let channel = LarkChannel::from_lark_config(lark);
-                channel.send(&SendMessage::new(output, target)).await?;
+                channel.send(&outbound).await?;
             }
             #[cfg(not(feature = "channel-lark"))]
             {
@@ -472,11 +501,11 @@ pub(crate) async fn deliver_announcement(
                 // Try [channels_config.feishu] first, then fall back to [channels_config.lark] with use_feishu=true
                 if let Some(feishu_cfg) = &config.channels_config.feishu {
                     let channel = LarkChannel::from_feishu_config(feishu_cfg);
-                    channel.send(&SendMessage::new(output, target)).await?;
+                    channel.send(&outbound).await?;
                 } else if let Some(lark_cfg) = &config.channels_config.lark {
                     if lark_cfg.use_feishu {
                         let channel = LarkChannel::from_config(lark_cfg);
-                        channel.send(&SendMessage::new(output, target)).await?;
+                        channel.send(&outbound).await?;
                     } else {
                         anyhow::bail!(
                             "feishu channel not configured: [channels_config.feishu] is missing \
@@ -503,7 +532,7 @@ pub(crate) async fn deliver_announcement(
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("email channel not configured"))?;
             let channel = EmailChannel::new(email.clone());
-            channel.send(&SendMessage::new(output, target)).await?;
+            channel.send(&outbound).await?;
         }
         "matrix" => {
             #[cfg(feature = "channel-matrix")]
@@ -522,7 +551,7 @@ pub(crate) async fn deliver_announcement(
                     mx.room_id.clone(),
                     mx.allowed_users.clone(),
                 );
-                channel.send(&SendMessage::new(output, target)).await?;
+                channel.send(&outbound).await?;
             }
             #[cfg(not(feature = "channel-matrix"))]
             {
@@ -533,6 +562,27 @@ pub(crate) async fn deliver_announcement(
     }
 
     Ok(())
+}
+
+pub(crate) async fn deliver_announcement(
+    config: &Config,
+    channel: &str,
+    target: &str,
+    output: &str,
+) -> Result<()> {
+    let strict_live_whatsapp_web = channel.eq_ignore_ascii_case("whatsapp_web");
+    deliver_message(
+        config,
+        channel,
+        target,
+        output,
+        &DeliveryRequestOptions {
+            daemon_first: true,
+            strict_live_whatsapp_web,
+            ..DeliveryRequestOptions::default()
+        },
+    )
+    .await
 }
 
 async fn run_job_command(

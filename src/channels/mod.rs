@@ -101,6 +101,7 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime};
+use tokio::io::AsyncReadExt;
 use tokio_util::sync::CancellationToken;
 
 /// Per-sender conversation history for channel messages.
@@ -4895,7 +4896,45 @@ pub(crate) async fn handle_command(command: crate::ChannelCommands, config: &Con
         crate::ChannelCommands::BindTelegram { identity } => {
             bind_telegram_identity(config, &identity).await
         }
+        crate::ChannelCommands::Send {
+            channel,
+            to,
+            message,
+            thread,
+        } => {
+            let payload = resolve_send_message_payload(message).await?;
+            let strict_live_whatsapp_web = channel.eq_ignore_ascii_case("whatsapp_web");
+            crate::cron::scheduler::deliver_message(
+                config,
+                &channel,
+                &to,
+                &payload,
+                &crate::cron::scheduler::DeliveryRequestOptions {
+                    thread,
+                    daemon_first: true,
+                    strict_live_whatsapp_web,
+                },
+            )
+            .await?;
+            println!("✅ Sent via channel '{channel}' to '{to}'");
+            Ok(())
+        }
     }
+}
+
+async fn resolve_send_message_payload(message: String) -> Result<String> {
+    if message != "-" {
+        return Ok(message);
+    }
+    let mut payload = String::new();
+    tokio::io::stdin()
+        .read_to_string(&mut payload)
+        .await
+        .context("Failed to read --message from stdin")?;
+    if payload.trim().is_empty() {
+        anyhow::bail!("stdin message is empty");
+    }
+    Ok(payload)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

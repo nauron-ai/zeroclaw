@@ -147,6 +147,28 @@ Examples:
         /// Telegram identity to allow (username without '@' or numeric user ID)
         identity: String,
     },
+    /// Send a message to a channel target
+    #[command(long_about = "\
+Send a message through a configured channel.
+
+Examples:
+  zeroclaw channel send --channel whatsapp_web --to +15551234567 --message \"done\"
+  echo \"hello\" | zeroclaw channel send --channel telegram --to 123456 --message -
+")]
+    Send {
+        /// Channel name (for example: whatsapp_web, whatsapp, telegram, discord)
+        #[arg(long)]
+        channel: String,
+        /// Recipient/target identifier (phone number, chat id, user id, etc.)
+        #[arg(long)]
+        to: String,
+        /// Message body; pass '-' to read from stdin
+        #[arg(long)]
+        message: String,
+        /// Optional thread identifier when channel supports threaded delivery
+        #[arg(long)]
+        thread: Option<String>,
+    },
 }
 
 /// Skills management subcommands
