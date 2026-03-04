@@ -93,7 +93,7 @@ use crate::security::{LeakDetector, LeakResult, SecurityPolicy};
 use crate::tools::{self, Tool};
 use crate::util::truncate_with_ellipsis;
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -4903,6 +4903,11 @@ pub(crate) async fn handle_command(command: crate::ChannelCommands, config: &Con
             thread,
         } => {
             let payload = resolve_send_message_payload(message).await?;
+            if try_daemon_channel_send(config, &channel, &to, &payload, thread.as_deref()).await? {
+                println!("✅ Sent via channel '{channel}' to '{to}' (daemon)");
+                return Ok(());
+            }
+
             let strict_live_whatsapp_web = channel.eq_ignore_ascii_case("whatsapp_web");
             crate::cron::scheduler::deliver_message(
                 config,
@@ -4935,6 +4940,56 @@ async fn resolve_send_message_payload(message: String) -> Result<String> {
         anyhow::bail!("stdin message is empty");
     }
     Ok(payload)
+}
+
+#[derive(Debug, Serialize)]
+struct DaemonChannelSendRequest<'a> {
+    channel: &'a str,
+    to: &'a str,
+    message: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thread: Option<&'a str>,
+}
+
+async fn try_daemon_channel_send(
+    config: &Config,
+    channel: &str,
+    to: &str,
+    message: &str,
+    thread: Option<&str>,
+) -> Result<bool> {
+    let url = format!(
+        "http://{}:{}/internal/channel/send",
+        config.gateway.host, config.gateway.port
+    );
+    let payload = DaemonChannelSendRequest {
+        channel,
+        to,
+        message,
+        thread,
+    };
+    let response = match reqwest::Client::new().post(url).json(&payload).send().await {
+        Ok(response) => response,
+        Err(err) if err.is_connect() || err.is_timeout() => return Ok(false),
+        Err(err) => anyhow::bail!("failed to contact daemon for channel send: {err}"),
+    };
+
+    if response.status().is_success() {
+        return Ok(true);
+    }
+    if matches!(
+        response.status(),
+        reqwest::StatusCode::NOT_FOUND
+            | reqwest::StatusCode::METHOD_NOT_ALLOWED
+            | reqwest::StatusCode::UNAUTHORIZED
+            | reqwest::StatusCode::FORBIDDEN
+    ) {
+        return Ok(false);
+    }
+
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    anyhow::bail!("daemon channel send failed ({status}): {body}");
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

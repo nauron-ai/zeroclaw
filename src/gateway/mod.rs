@@ -866,6 +866,7 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
         .route("/api/cli-tools", get(api::handle_api_cli_tools))
         .route("/api/health", get(api::handle_api_health))
         .route("/api/node-control", post(handle_node_control))
+        .route("/internal/channel/send", post(handle_internal_channel_send))
         // ── SSE event stream ──
         .route("/api/events", get(sse::handle_sse_events))
         // ── WebSocket agent chat ──
@@ -912,6 +913,54 @@ async fn handle_health(State(state): State<AppState>) -> impl IntoResponse {
         "runtime": crate::health::snapshot_json(),
     });
     Json(body)
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+struct InternalChannelSendBody {
+    channel: String,
+    to: String,
+    message: String,
+    thread: Option<String>,
+}
+
+/// POST /internal/channel/send — loopback-only daemon message delivery.
+async fn handle_internal_channel_send(
+    State(state): State<AppState>,
+    ConnectInfo(peer_addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(body): Json<InternalChannelSendBody>,
+) -> impl IntoResponse {
+    if !is_loopback_request(Some(peer_addr), &headers, state.trust_forwarded_headers) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"error": "loopback-only endpoint"})),
+        )
+            .into_response();
+    }
+
+    let config = state.config.lock().clone();
+    let strict_live_whatsapp_web = body.channel.eq_ignore_ascii_case("whatsapp_web");
+    let result = crate::cron::scheduler::deliver_message(
+        &config,
+        &body.channel,
+        &body.to,
+        &body.message,
+        &crate::cron::scheduler::DeliveryRequestOptions {
+            thread: body.thread.clone(),
+            daemon_first: true,
+            strict_live_whatsapp_web,
+        },
+    )
+    .await;
+
+    match result {
+        Ok(()) => Json(serde_json::json!({"status": "ok"})).into_response(),
+        Err(err) => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"error": err.to_string()})),
+        )
+            .into_response(),
+    }
 }
 
 /// Prometheus content type for text exposition format.
