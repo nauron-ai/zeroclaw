@@ -217,8 +217,15 @@ landlock = { version = "0.4", optional = true }
 libc = "0.2"
 
 [features]
-# Keep default minimal for widest host compatibility (including macOS 10.15).
-default = []
+# Fork default profile (matches production/runtime expectations in Nauron infra).
+default = [
+    "memory-postgres",
+    "observability-otel",
+    "browser-native",
+    "web-fetch-html2md",
+    "firecrawl",
+    "whatsapp-web",
+]
 hardware = ["nusb", "tokio-serial"]
 channel-matrix = ["dep:matrix-sdk"]
 channel-lark = ["dep:prost"]
