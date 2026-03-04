@@ -147,10 +147,23 @@ impl SyncStateStore {
 
     fn run_db_task_sync<T, F>(&self, task: F) -> Result<T>
     where
-        F: FnOnce(&mut Client) -> Result<T>,
+        T: Send + 'static,
+        F: FnOnce(&mut Client) -> Result<T> + Send + 'static,
     {
-        let mut client = connect_client(&self.db_url, self.connect_timeout_secs, self.tls_mode)?;
-        task(&mut client)
+        let db_url = self.db_url.clone();
+        let connect_timeout_secs = self.connect_timeout_secs;
+        let tls_mode = self.tls_mode;
+        let handle = std::thread::Builder::new()
+            .name("postgres-qdrant-sync-task".to_string())
+            .spawn(move || -> Result<T> {
+                let mut client = connect_client(&db_url, connect_timeout_secs, tls_mode)?;
+                task(&mut client)
+            })
+            .context("failed to spawn postgres qdrant sync task thread")?;
+
+        handle
+            .join()
+            .map_err(|_| anyhow::anyhow!("postgres qdrant sync task thread panicked"))?
     }
 }
 
