@@ -199,14 +199,43 @@ fn convert_tool_specs(tools: Option<&[crate::tools::ToolSpec]>) -> Vec<Value> {
         .unwrap_or_default()
         .iter()
         .map(|tool| {
+            let mut parameters = tool.parameters.clone();
+            normalize_responses_tool_schema(&mut parameters);
             serde_json::json!({
                 "type": "function",
                 "name": tool.name,
                 "description": tool.description,
-                "parameters": tool.parameters,
+                "parameters": parameters,
             })
         })
         .collect()
+}
+
+fn schema_declares_array(schema: &serde_json::Map<String, Value>) -> bool {
+    match schema.get("type") {
+        Some(Value::String(kind)) => kind == "array",
+        Some(Value::Array(kinds)) => kinds.iter().any(|kind| kind.as_str() == Some("array")),
+        _ => false,
+    }
+}
+
+fn normalize_responses_tool_schema(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            for child in map.values_mut() {
+                normalize_responses_tool_schema(child);
+            }
+            if schema_declares_array(map) && !map.contains_key("items") {
+                map.insert("items".to_string(), serde_json::json!({}));
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                normalize_responses_tool_schema(item);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn default_zeroclaw_dir() -> PathBuf {
@@ -1779,6 +1808,27 @@ data: [DONE]
             converted[0]["parameters"]["required"][0],
             "command"
         );
+    }
+
+    #[test]
+    fn convert_tool_specs_adds_items_for_array_without_items() {
+        let tools = vec![crate::tools::ToolSpec {
+            name: "channel_ack_config".to_string(),
+            description: "test".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "rules": {
+                        "type": ["array", "null"]
+                    }
+                },
+                "required": ["rules"]
+            }),
+        }];
+
+        let converted = convert_tool_specs(Some(&tools));
+        assert_eq!(converted.len(), 1);
+        assert_eq!(converted[0]["parameters"]["properties"]["rules"]["items"], serde_json::json!({}));
     }
 
     #[test]
