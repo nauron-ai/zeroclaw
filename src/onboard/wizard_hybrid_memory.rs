@@ -2,7 +2,7 @@ use crate::config::MemoryConfig;
 use crate::memory::MemoryBackendKind;
 use anyhow::{bail, Result};
 use console::style;
-use dialoguer::Input;
+use dialoguer::{Input, Password};
 
 pub(super) fn configure_hybrid_qdrant_memory(
     config: &mut MemoryConfig,
@@ -50,10 +50,10 @@ pub(super) fn configure_hybrid_qdrant_memory(
         config.qdrant.collection = qdrant_collection.to_string();
     }
 
-    let qdrant_api_key: String = Input::with_theme(super::wizard_theme())
+    let qdrant_api_key: String = Password::with_theme(super::wizard_theme())
         .with_prompt("  Qdrant API key (optional, Enter to skip)")
-        .allow_empty(true)
-        .interact_text()?;
+        .allow_empty_password(true)
+        .interact()?;
     let qdrant_api_key = qdrant_api_key.trim();
     config.qdrant.api_key = if qdrant_api_key.is_empty() {
         None
