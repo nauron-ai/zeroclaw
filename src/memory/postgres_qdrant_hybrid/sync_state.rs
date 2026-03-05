@@ -67,7 +67,10 @@ impl SyncStateStore {
                     op = EXCLUDED.op,
                     status = 'pending',
                     updated_at = EXCLUDED.updated_at,
-                    content_hash = EXCLUDED.content_hash
+                    content_hash = EXCLUDED.content_hash,
+                    attempt_count = 0,
+                    last_error = NULL,
+                    last_attempt_at = NULL
                 "
             );
             client.execute(&stmt, &[&key, &op, &now, &content_hash])?;
@@ -86,7 +89,10 @@ impl SyncStateStore {
                  SET status='synced', last_error=NULL, last_synced_at=$2, updated_at=$2
                  WHERE key=$1"
             );
-            client.execute(&stmt, &[&key, &now])?;
+            let affected = client.execute(&stmt, &[&key, &now])?;
+            if affected == 0 {
+                anyhow::bail!("sync state row not found for key '{key}' in {table}");
+            }
             Ok(())
         })
         .await
@@ -103,7 +109,10 @@ impl SyncStateStore {
                  SET status='failed', last_error=$2, attempt_count=attempt_count+1, last_attempt_at=$3, updated_at=$3
                  WHERE key=$1"
             );
-            client.execute(&stmt, &[&key, &error, &now])?;
+            let affected = client.execute(&stmt, &[&key, &error, &now])?;
+            if affected == 0 {
+                anyhow::bail!("sync state row not found for key '{key}' in {table}");
+            }
             Ok(())
         })
         .await
@@ -179,17 +188,8 @@ impl SyncStateStore {
         let db_url = self.db_url.clone();
         let connect_timeout_secs = self.connect_timeout_secs;
         let tls_mode = self.tls_mode;
-        let handle = std::thread::Builder::new()
-            .name("postgres-qdrant-sync-task".to_string())
-            .spawn(move || -> Result<T> {
-                let mut client = connect_client(&db_url, connect_timeout_secs, tls_mode)?;
-                task(&mut client)
-            })
-            .context("failed to spawn postgres qdrant sync task thread")?;
-
-        handle
-            .join()
-            .map_err(|_| anyhow::anyhow!("postgres qdrant sync task thread panicked"))?
+        let mut client = connect_client(&db_url, connect_timeout_secs, tls_mode)?;
+        task(&mut client)
     }
 }
 
