@@ -104,14 +104,24 @@ impl Drop for PostgresClientHolder {
             return;
         };
 
-        let _ = std::thread::Builder::new()
+        let drop_thread = std::thread::Builder::new()
             .name("postgres-memory-drop".to_string())
-            .spawn(move || drop(client))
-            .and_then(|handle| {
-                handle
-                    .join()
-                    .map_err(|_| std::io::Error::other("PostgreSQL drop thread panicked"))
-            });
+            .spawn(move || drop(client));
+
+        match drop_thread {
+            Ok(handle) => {
+                if handle.join().is_err() {
+                    tracing::warn!(
+                        "postgres-memory-drop thread panicked while dropping PostgreSQL client"
+                    );
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    "failed to spawn postgres-memory-drop thread while dropping PostgreSQL client: {err}"
+                );
+            }
+        }
     }
 }
 
