@@ -171,33 +171,43 @@ impl SyncStateStore {
 
     fn init_schema(&self) -> Result<()> {
         let table = self.qualified_table.clone();
-        self.run_db_task_sync(move |client| {
-            let lock_key = format!("{table}:init");
-            client.query("SELECT pg_advisory_lock(hashtext($1))", &[&lock_key])?;
+        let store = self.clone();
+        let init_handle = std::thread::Builder::new()
+            .name("postgres-qdrant-sync-init".to_string())
+            .spawn(move || {
+                store.run_db_task_sync(move |client| {
+                    let lock_key = format!("{table}:init");
+                    client.query("SELECT pg_advisory_lock(hashtext($1))", &[&lock_key])?;
 
-            let init_result = client.batch_execute(&format!(
-                "\
-                CREATE TABLE IF NOT EXISTS {table} (
-                    key TEXT PRIMARY KEY,
-                    op TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    attempt_count INTEGER NOT NULL DEFAULT 0,
-                    last_error TEXT,
-                    updated_at TIMESTAMPTZ NOT NULL,
-                    last_attempt_at TIMESTAMPTZ,
-                    last_synced_at TIMESTAMPTZ,
-                    content_hash TEXT
-                );
-                CREATE INDEX IF NOT EXISTS idx_memories_qdrant_sync_status_updated ON {table}(status, updated_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_memories_qdrant_sync_op_status ON {table}(op, status);
-                CREATE INDEX IF NOT EXISTS idx_memories_qdrant_sync_last_attempt ON {table}(last_attempt_at);
-                "
-            ));
+                    let init_result = client.batch_execute(&format!(
+                        "\
+                        CREATE TABLE IF NOT EXISTS {table} (
+                            key TEXT PRIMARY KEY,
+                            op TEXT NOT NULL,
+                            status TEXT NOT NULL,
+                            attempt_count INTEGER NOT NULL DEFAULT 0,
+                            last_error TEXT,
+                            updated_at TIMESTAMPTZ NOT NULL,
+                            last_attempt_at TIMESTAMPTZ,
+                            last_synced_at TIMESTAMPTZ,
+                            content_hash TEXT
+                        );
+                        CREATE INDEX IF NOT EXISTS idx_memories_qdrant_sync_status_updated ON {table}(status, updated_at DESC);
+                        CREATE INDEX IF NOT EXISTS idx_memories_qdrant_sync_op_status ON {table}(op, status);
+                        CREATE INDEX IF NOT EXISTS idx_memories_qdrant_sync_last_attempt ON {table}(last_attempt_at);
+                        "
+                    ));
 
-            let _ = client.query("SELECT pg_advisory_unlock(hashtext($1))", &[&lock_key]);
-            init_result?;
-            Ok(())
-        })
+                    let _ = client.query("SELECT pg_advisory_unlock(hashtext($1))", &[&lock_key]);
+                    init_result?;
+                    Ok(())
+                })
+            })
+            .context("failed to spawn postgres-qdrant-sync-init thread")?;
+
+        init_handle
+            .join()
+            .map_err(|_| anyhow::anyhow!("postgres-qdrant-sync-init thread panicked"))?
     }
 
     async fn run_db_task<T, F>(&self, task: F) -> Result<T>
