@@ -23,7 +23,11 @@ pub(super) fn configure_hybrid_qdrant_memory(
                 "postgres_qdrant_hybrid requires [storage.provider.config].db_url in config.toml.",
             );
         }
-        _ => {}
+        _ => {
+            bail!(
+                "configure_hybrid_qdrant_memory only supports sqlite_qdrant_hybrid and postgres_qdrant_hybrid"
+            );
+        }
     }
 
     let qdrant_url_default = config

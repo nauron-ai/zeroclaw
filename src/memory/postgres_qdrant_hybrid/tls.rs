@@ -1,5 +1,10 @@
 #[derive(Debug)]
-pub struct NoCertVerifier;
+struct NoCertVerifier;
+
+pub(super) fn insecure_verifier(
+) -> std::sync::Arc<dyn rustls::client::danger::ServerCertVerifier> {
+    std::sync::Arc::new(NoCertVerifier)
+}
 
 impl rustls::client::danger::ServerCertVerifier for NoCertVerifier {
     fn verify_server_cert(

@@ -208,12 +208,25 @@ fn connect_client(
     }
 
     if tls_mode {
-        let mut tls_config = rustls::ClientConfig::builder()
-            .with_root_certificates(rustls::RootCertStore::empty())
-            .with_no_client_auth();
-        tls_config
-            .dangerous()
-            .set_certificate_verifier(std::sync::Arc::new(super::tls::NoCertVerifier));
+        let tls_insecure_skip_verify = storage_tls_insecure_skip_verify();
+        let tls_config = if tls_insecure_skip_verify {
+            tracing::warn!(
+                "ZEROCLAW_STORAGE_TLS_INSECURE_SKIP_VERIFY is enabled; TLS certificate verification is disabled"
+            );
+            let mut config = rustls::ClientConfig::builder()
+                .with_root_certificates(rustls::RootCertStore::empty())
+                .with_no_client_auth();
+            config
+                .dangerous()
+                .set_certificate_verifier(super::tls::insecure_verifier());
+            config
+        } else {
+            let root_store: rustls::RootCertStore =
+                webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
+            rustls::ClientConfig::builder()
+                .with_root_certificates(root_store)
+                .with_no_client_auth()
+        };
         let tls = tokio_postgres_rustls::MakeRustlsConnect::new(tls_config);
         config
             .connect(tls)
@@ -223,6 +236,18 @@ fn connect_client(
             .connect(NoTls)
             .context("failed to connect PostgreSQL sync state")
     }
+}
+
+fn storage_tls_insecure_skip_verify() -> bool {
+    std::env::var("ZEROCLAW_STORAGE_TLS_INSECURE_SKIP_VERIFY")
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false)
 }
 
 fn validate_identifier(value: &str, field_name: &str) -> Result<()> {
