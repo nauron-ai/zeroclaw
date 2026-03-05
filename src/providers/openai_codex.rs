@@ -442,12 +442,33 @@ fn build_responses_input(messages: &[ChatMessage]) -> (String, Vec<ResponsesInpu
                     content: content_items,
                 });
             }
+            "tool" => {
+                let tool_text = parse_tool_result_content(&msg.content).unwrap_or_else(|| {
+                    format!("[tool_result]\n{}", msg.content)
+                });
+                if tool_text.trim().is_empty() {
+                    continue;
+                }
+                input.push(ResponsesInput {
+                    role: "user".to_string(),
+                    content: vec![ResponsesInputContent {
+                        kind: "input_text".to_string(),
+                        text: Some(tool_text),
+                        image_url: None,
+                    }],
+                });
+            }
             "assistant" => {
+                let assistant_text =
+                    parse_assistant_native_content(&msg.content).unwrap_or_else(|| msg.content.clone());
+                if assistant_text.trim().is_empty() {
+                    continue;
+                }
                 input.push(ResponsesInput {
                     role: "assistant".to_string(),
                     content: vec![ResponsesInputContent {
                         kind: "output_text".to_string(),
-                        text: Some(msg.content.clone()),
+                        text: Some(assistant_text),
                         image_url: None,
                     }],
                 });
@@ -463,6 +484,41 @@ fn build_responses_input(messages: &[ChatMessage]) -> (String, Vec<ResponsesInpu
     };
 
     (instructions, input)
+}
+
+fn parse_assistant_native_content(raw: &str) -> Option<String> {
+    let parsed = serde_json::from_str::<Value>(raw).ok()?;
+    if parsed.get("tool_calls").is_none() {
+        return None;
+    }
+
+    first_nonempty(parsed.get("content").and_then(Value::as_str))
+        .or_else(|| first_nonempty(parsed.get("reasoning_content").and_then(Value::as_str)))
+}
+
+fn parse_tool_result_content(raw: &str) -> Option<String> {
+    let parsed = serde_json::from_str::<Value>(raw).ok()?;
+    let call_id = first_nonempty(
+        parsed
+            .get("tool_call_id")
+            .and_then(Value::as_str)
+            .or_else(|| parsed.get("toolUseId").and_then(Value::as_str))
+            .or_else(|| parsed.get("tool_use_id").and_then(Value::as_str)),
+    );
+
+    let content = parsed.get("content");
+    let rendered_content = match content {
+        Some(Value::String(text)) => first_nonempty(Some(text)),
+        Some(other) => first_nonempty(Some(&other.to_string())),
+        None => None,
+    }?;
+
+    let header = call_id
+        .as_deref()
+        .map(|id| format!("[tool_result:{id}]"))
+        .unwrap_or_else(|| "[tool_result]".to_string());
+
+    Some(format!("{header}\n{rendered_content}"))
 }
 
 fn clamp_reasoning_effort(model: &str, effort: &str) -> String {
@@ -1892,9 +1948,41 @@ data: [DONE]
         ];
         let (instructions, input) = build_responses_input(&messages);
         assert_eq!(instructions, DEFAULT_CODEX_INSTRUCTIONS);
+        assert_eq!(input.len(), 2);
+        let json = serde_json::to_value(&input[0]).unwrap();
+        assert_eq!(json["role"], "user");
+        assert_eq!(json["content"][0]["text"], "[tool_result]\nresult");
+        let json = serde_json::to_value(&input[1]).unwrap();
+        assert_eq!(json["role"], "user");
+    }
+
+    #[test]
+    fn build_responses_input_parses_native_tool_result_payload() {
+        let messages = vec![ChatMessage::tool(
+            r#"{"tool_call_id":"call_123","content":"uptime output"}"#,
+        )];
+        let (_, input) = build_responses_input(&messages);
+
         assert_eq!(input.len(), 1);
         let json = serde_json::to_value(&input[0]).unwrap();
         assert_eq!(json["role"], "user");
+        assert_eq!(
+            json["content"][0]["text"],
+            "[tool_result:call_123]\nuptime output"
+        );
+    }
+
+    #[test]
+    fn build_responses_input_strips_assistant_native_payload_wrapper() {
+        let messages = vec![ChatMessage::assistant(
+            r#"{"content":"checking","tool_calls":[{"id":"tc1","name":"shell","arguments":"{}"}]}"#,
+        )];
+        let (_, input) = build_responses_input(&messages);
+
+        assert_eq!(input.len(), 1);
+        let json = serde_json::to_value(&input[0]).unwrap();
+        assert_eq!(json["role"], "assistant");
+        assert_eq!(json["content"][0]["text"], "checking");
     }
 
     #[test]
