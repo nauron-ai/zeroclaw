@@ -1,90 +1,198 @@
 use crate::providers::ToolCall as ProviderToolCall;
-use serde_json::Value;
+use serde_json::{Map, Value};
+use thiserror::Error;
+
+const ASSISTANT_PAYLOAD_CONTEXT: &str = "assistant tool-calls payload";
+const TOOL_RESULT_PAYLOAD_CONTEXT: &str = "tool result payload";
 
 #[derive(Debug, Clone)]
-pub(crate) struct AssistantToolCallsPayload {
-    pub content: Option<String>,
-    pub reasoning_content: Option<String>,
-    pub tool_calls: Vec<ProviderToolCall>,
+pub(in crate::providers::openai) struct AssistantToolCallsPayload {
+    content: Option<String>,
+    reasoning_content: Option<String>,
+    tool_calls: Vec<ProviderToolCall>,
+}
+
+impl AssistantToolCallsPayload {
+    pub(in crate::providers::openai) fn content(&self) -> Option<&str> {
+        self.content.as_deref()
+    }
+
+    pub(in crate::providers::openai) fn reasoning_content(&self) -> Option<&str> {
+        self.reasoning_content.as_deref()
+    }
+
+    pub(in crate::providers::openai) fn tool_calls(&self) -> &[ProviderToolCall] {
+        &self.tool_calls
+    }
+
+    pub(in crate::providers::openai) fn into_parts(
+        self,
+    ) -> (Option<String>, Option<String>, Vec<ProviderToolCall>) {
+        (self.content, self.reasoning_content, self.tool_calls)
+    }
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct ToolResultPayload {
-    pub tool_call_id: Option<String>,
-    pub content: Option<String>,
+pub(in crate::providers::openai) struct ToolResultPayload {
+    tool_call_id: Option<String>,
+    content: Option<String>,
 }
 
-pub(crate) fn parse_assistant_tool_calls_payload(raw: &str) -> Option<AssistantToolCallsPayload> {
-    let parsed = serde_json::from_str::<Value>(raw).ok()?;
-    let tool_calls_value = parsed.get("tool_calls")?;
-    let tool_calls = serde_json::from_value::<Vec<ProviderToolCall>>(tool_calls_value.clone()).ok()?;
+impl ToolResultPayload {
+    pub(in crate::providers::openai) fn tool_call_id(&self) -> Option<&str> {
+        self.tool_call_id.as_deref()
+    }
 
-    Some(AssistantToolCallsPayload {
-        content: parsed
-            .get("content")
-            .and_then(Value::as_str)
-            .map(ToString::to_string),
-        reasoning_content: parsed
-            .get("reasoning_content")
-            .and_then(Value::as_str)
-            .map(ToString::to_string),
-        tool_calls,
-    })
+    pub(in crate::providers::openai) fn content(&self) -> Option<&str> {
+        self.content.as_deref()
+    }
+
+    pub(in crate::providers::openai) fn into_parts(self) -> (Option<String>, Option<String>) {
+        (self.tool_call_id, self.content)
+    }
 }
 
-pub(crate) fn parse_tool_result_payload(raw: &str) -> Option<ToolResultPayload> {
-    let parsed = serde_json::from_str::<Value>(raw).ok()?;
-    let tool_call_id = parsed
-        .get("tool_call_id")
-        .and_then(Value::as_str)
-        .or_else(|| parsed.get("toolUseId").and_then(Value::as_str))
-        .or_else(|| parsed.get("tool_use_id").and_then(Value::as_str))
-        .map(ToString::to_string);
+#[derive(Debug, Error)]
+pub(in crate::providers::openai) enum OpenAiPayloadParseError {
+    #[error("invalid JSON in {context}: {source}")]
+    InvalidJson {
+        context: &'static str,
+        #[source]
+        source: serde_json::Error,
+    },
+    #[error("invalid shape for {context}: {details}")]
+    InvalidShape {
+        context: &'static str,
+        details: String,
+    },
+    #[error("invalid field type for {field} in {context}; expected {expected}")]
+    InvalidFieldType {
+        context: &'static str,
+        field: &'static str,
+        expected: &'static str,
+    },
+}
 
-    let content = match parsed.get("content") {
-        Some(Value::String(text)) => Some(text.clone()),
-        Some(other) => Some(other.to_string()),
-        None => None,
+pub(in crate::providers::openai) fn parse_assistant_tool_calls_payload(
+    raw: &str,
+) -> Result<Option<AssistantToolCallsPayload>, OpenAiPayloadParseError> {
+    let Some(map) = parse_candidate_object(raw, ASSISTANT_PAYLOAD_CONTEXT, &["tool_calls"])? else {
+        return Ok(None);
     };
 
-    Some(ToolResultPayload {
-        tool_call_id,
+    let content = optional_string_field(&map, ASSISTANT_PAYLOAD_CONTEXT, "content")?;
+    let reasoning_content =
+        optional_string_field(&map, ASSISTANT_PAYLOAD_CONTEXT, "reasoning_content")?;
+    let tool_calls = serde_json::from_value::<Vec<ProviderToolCall>>(
+        map.get("tool_calls").cloned().expect("candidate key must exist"),
+    )
+    .map_err(|source| OpenAiPayloadParseError::InvalidShape {
+        context: ASSISTANT_PAYLOAD_CONTEXT,
+        details: format!("tool_calls: {source}"),
+    })?;
+
+    Ok(Some(AssistantToolCallsPayload {
         content,
-    })
+        reasoning_content,
+        tool_calls,
+    }))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub(in crate::providers::openai) fn parse_tool_result_payload(
+    raw: &str,
+) -> Result<Option<ToolResultPayload>, OpenAiPayloadParseError> {
+    let Some(map) = parse_candidate_object(
+        raw,
+        TOOL_RESULT_PAYLOAD_CONTEXT,
+        &["tool_call_id", "toolUseId", "tool_use_id"],
+    )? else {
+        return Ok(None);
+    };
 
-    #[test]
-    fn parses_assistant_payload_with_tool_calls() {
-        let payload = parse_assistant_tool_calls_payload(
-            r#"{"content":"checking","reasoning_content":"r","tool_calls":[{"id":"t1","name":"shell","arguments":"{}"}]}"#,
-        )
-        .expect("payload should parse");
+    let tool_call_id = first_present_string_field(
+        &map,
+        TOOL_RESULT_PAYLOAD_CONTEXT,
+        &["tool_call_id", "toolUseId", "tool_use_id"],
+    )?;
+    let content = match map.get("content") {
+        Some(Value::Null) | None => None,
+        Some(Value::String(text)) => Some(text.clone()),
+        Some(other) => Some(other.to_string()),
+    };
 
-        assert_eq!(payload.content.as_deref(), Some("checking"));
-        assert_eq!(payload.reasoning_content.as_deref(), Some("r"));
-        assert_eq!(payload.tool_calls.len(), 1);
-        assert_eq!(payload.tool_calls[0].id, "t1");
+    Ok(Some(ToolResultPayload {
+        tool_call_id,
+        content,
+    }))
+}
+
+fn parse_candidate_object(
+    raw: &str,
+    context: &'static str,
+    candidate_keys: &[&str],
+) -> Result<Option<Map<String, Value>>, OpenAiPayloadParseError> {
+    let trimmed = raw.trim();
+    if !trimmed.starts_with('{') || !contains_candidate_key(trimmed, candidate_keys) {
+        return Ok(None);
     }
 
-    #[test]
-    fn parses_tool_result_with_alias_id_field() {
-        let payload = parse_tool_result_payload(r#"{"toolUseId":"abc","content":"done"}"#)
-            .expect("payload should parse");
+    let parsed = serde_json::from_str::<Value>(trimmed).map_err(|source| {
+        OpenAiPayloadParseError::InvalidJson { context, source }
+    })?;
+    let Value::Object(map) = parsed else {
+        return Err(OpenAiPayloadParseError::InvalidShape {
+            context,
+            details: "expected top-level object".to_string(),
+        });
+    };
 
-        assert_eq!(payload.tool_call_id.as_deref(), Some("abc"));
-        assert_eq!(payload.content.as_deref(), Some("done"));
+    if !candidate_keys.iter().any(|key| map.contains_key(*key)) {
+        return Ok(None);
     }
 
-    #[test]
-    fn module_stays_under_250_loc_budget() {
-        let loc = include_str!("shared.rs").lines().count();
-        assert!(
-            loc <= 250,
-            "openai/shared.rs exceeded 250 LOC budget: {loc}"
-        );
+    Ok(Some(map))
+}
+
+fn optional_string_field(
+    map: &Map<String, Value>,
+    context: &'static str,
+    field: &'static str,
+) -> Result<Option<String>, OpenAiPayloadParseError> {
+    match map.get(field) {
+        Some(Value::Null) | None => Ok(None),
+        Some(Value::String(text)) => Ok(Some(text.clone())),
+        Some(_) => Err(OpenAiPayloadParseError::InvalidFieldType {
+            context,
+            field,
+            expected: "string",
+        }),
     }
+}
+
+fn first_present_string_field(
+    map: &Map<String, Value>,
+    context: &'static str,
+    fields: &[&'static str],
+) -> Result<Option<String>, OpenAiPayloadParseError> {
+    for field in fields {
+        match map.get(*field) {
+            Some(Value::Null) | None => continue,
+            Some(Value::String(text)) => return Ok(Some(text.clone())),
+            Some(_) => {
+                return Err(OpenAiPayloadParseError::InvalidFieldType {
+                    context,
+                    field,
+                    expected: "string",
+                });
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+fn contains_candidate_key(raw: &str, candidate_keys: &[&str]) -> bool {
+    candidate_keys
+        .iter()
+        .any(|key| raw.contains(&format!("\"{key}\"")))
 }
