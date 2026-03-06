@@ -83,19 +83,27 @@ impl SyncStateStore {
         let table = self.qualified_table.clone();
         self.run_db_task(move |client| {
             let now = Utc::now();
-            let stmt = format!(
-                "UPDATE {table}
-                 SET status='synced', last_error=NULL, last_synced_at=$2, updated_at=$2
-                 WHERE key=$1
-                   AND status='pending'
-                   AND op=$3
-                   AND (
-                       ($4 IS NULL AND content_hash IS NULL)
-                       OR content_hash=$4
-                   )"
-            );
-            let affected =
-                client.execute(&stmt, &[&key, &now, &expected_op, &expected_content_hash])?;
+            let affected = if let Some(content_hash) = expected_content_hash.as_deref() {
+                let stmt = format!(
+                    "UPDATE {table}
+                     SET status='synced', last_error=NULL, last_synced_at=$2, updated_at=$2
+                     WHERE key=$1
+                       AND status='pending'
+                       AND op=$3
+                       AND content_hash=$4"
+                );
+                client.execute(&stmt, &[&key, &now, &expected_op, &content_hash])?
+            } else {
+                let stmt = format!(
+                    "UPDATE {table}
+                     SET status='synced', last_error=NULL, last_synced_at=$2, updated_at=$2
+                     WHERE key=$1
+                       AND status='pending'
+                       AND op=$3
+                       AND content_hash IS NULL"
+                );
+                client.execute(&stmt, &[&key, &now, &expected_op])?
+            };
             if affected == 0 {
                 anyhow::bail!("sync state changed concurrently for key '{key}' in {table}");
             }
@@ -118,21 +126,27 @@ impl SyncStateStore {
         let table = self.qualified_table.clone();
         self.run_db_task(move |client| {
             let now = Utc::now();
-            let stmt = format!(
-                "UPDATE {table}
-                 SET status='failed', last_error=$2, attempt_count=attempt_count+1, last_attempt_at=$3, updated_at=$3
-                 WHERE key=$1
-                   AND status='pending'
-                   AND op=$4
-                   AND (
-                       ($5 IS NULL AND content_hash IS NULL)
-                       OR content_hash=$5
-                   )"
-            );
-            let affected = client.execute(
-                &stmt,
-                &[&key, &error, &now, &expected_op, &expected_content_hash],
-            )?;
+            let affected = if let Some(content_hash) = expected_content_hash.as_deref() {
+                let stmt = format!(
+                    "UPDATE {table}
+                     SET status='failed', last_error=$2, attempt_count=attempt_count+1, last_attempt_at=$3, updated_at=$3
+                     WHERE key=$1
+                       AND status='pending'
+                       AND op=$4
+                       AND content_hash=$5"
+                );
+                client.execute(&stmt, &[&key, &error, &now, &expected_op, &content_hash])?
+            } else {
+                let stmt = format!(
+                    "UPDATE {table}
+                     SET status='failed', last_error=$2, attempt_count=attempt_count+1, last_attempt_at=$3, updated_at=$3
+                     WHERE key=$1
+                       AND status='pending'
+                       AND op=$4
+                       AND content_hash IS NULL"
+                );
+                client.execute(&stmt, &[&key, &error, &now, &expected_op])?
+            };
             if affected == 0 {
                 anyhow::bail!("sync state changed concurrently for key '{key}' in {table}");
             }
