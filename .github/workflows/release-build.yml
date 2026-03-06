@@ -35,12 +35,12 @@ jobs:
 
             - name: Self-heal Rust toolchain cache
               shell: bash
-              run: ./scripts/ci/self_heal_rust_toolchain.sh 1.92.0
+              run: ./scripts/ci/self_heal_rust_toolchain.sh 1.94.0
 
             - name: Setup Rust
               uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
               with:
-                  toolchain: 1.92.0
+                  toolchain: 1.94.0
                   components: rustfmt, clippy
 
             - name: Ensure C toolchain for Rust builds
@@ -51,17 +51,17 @@ jobs:
               shell: bash
               env:
                   ENSURE_CARGO_COMPONENT_STRICT: "true"
-              run: bash ./scripts/ci/ensure_cargo_component.sh 1.92.0
+              run: bash ./scripts/ci/ensure_cargo_component.sh 1.94.0
 
             - name: Ensure rustfmt and clippy components
               shell: bash
-              run: rustup component add rustfmt clippy --toolchain 1.92.0
+              run: rustup component add rustfmt clippy --toolchain 1.94.0
 
             - name: Activate toolchain binaries on PATH
               shell: bash
               run: |
                   set -euo pipefail
-                  toolchain_bin="$(dirname "$(rustup which --toolchain 1.92.0 cargo)")"
+                  toolchain_bin="$(dirname "$(rustup which --toolchain 1.94.0 cargo)")"
                   echo "$toolchain_bin" >> "$GITHUB_PATH"
 
             - name: Cache Cargo registry and target

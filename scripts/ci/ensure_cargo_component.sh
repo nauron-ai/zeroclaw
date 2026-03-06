@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-requested_toolchain="${1:-1.92.0}"
+requested_toolchain="${1:-1.94.0}"
 fallback_toolchain="${2:-stable}"
 strict_mode_raw="${3:-${ENSURE_CARGO_COMPONENT_STRICT:-false}}"
 strict_mode="$(printf '%s' "${strict_mode_raw}" | tr '[:upper:]' '[:lower:]')"

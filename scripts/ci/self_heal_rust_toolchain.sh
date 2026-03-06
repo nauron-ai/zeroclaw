@@ -4,7 +4,7 @@ set -euo pipefail
 # Remove corrupted toolchain installs that can break rustc startup on long-lived runners.
 # Usage: ./scripts/ci/self_heal_rust_toolchain.sh [toolchain]
 
-TOOLCHAIN="${1:-1.92.0}"
+TOOLCHAIN="${1:-1.94.0}"
 
 # Use per-job Rust homes on self-hosted runners to avoid cross-runner corruption/races.
 if [ -n "${RUNNER_TEMP:-}" ]; then

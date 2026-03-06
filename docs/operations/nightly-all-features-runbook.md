@@ -30,7 +30,7 @@ Lane owners are configured in `.github/release/nightly-owner-routing.json`.
 ## Scheduler and Activation Notes
 
 - Schedule contract: daily at `03:15 UTC` (`cron: 15 3 * * *`).
-- Determinism contract: pinned Rust toolchain (`1.92.0`), locked Cargo commands, explicit apt package install for all-features lane.
+- Determinism contract: pinned Rust toolchain (`1.94.0`), locked Cargo commands, explicit apt package install for all-features lane.
 - Nightly profile runs are emitted by `feature-matrix.yml`; this keeps manual dispatch and schedule discoverable from the active workflow catalog.
 
 ## Ownership Routing and Escalation
