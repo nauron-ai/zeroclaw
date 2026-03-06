@@ -211,6 +211,15 @@ impl WebSearchTool {
         }
     }
 
+    fn implicit_fallback_providers(&self) -> &'static [&'static str] {
+        match self.provider.as_str() {
+            // Firecrawl is useful when healthy, but on a self-hosted node it can
+            // restart independently from the agent. Keep a zero-config escape hatch.
+            "firecrawl" if self.fallback_providers.is_empty() => &["duckduckgo"],
+            _ => &[],
+        }
+    }
+
     fn provider_chain(&self) -> anyhow::Result<Vec<&'static str>> {
         let mut chain: Vec<&'static str> = Vec::new();
         let mut seen: HashSet<&'static str> = HashSet::new();
@@ -219,6 +228,8 @@ impl WebSearchTool {
             self.fallback_providers
                 .iter()
                 .map(std::string::String::as_str),
+        ).chain(
+            self.implicit_fallback_providers().iter().copied(),
         ) {
             let normalized = Self::normalize_provider(raw).ok_or_else(|| {
                 anyhow::anyhow!(
@@ -896,7 +907,7 @@ impl Tool for WebSearchTool {
         let retry_attempts = self.retries_per_provider + 1;
 
         let mut result: Option<String> = None;
-        for provider in providers {
+        for provider in &providers {
             let mut attempt = 0u32;
             let mut success = false;
             while attempt < retry_attempts {
@@ -907,6 +918,14 @@ impl Tool for WebSearchTool {
                         break;
                     }
                     Err(error) => {
+                        tracing::warn!(
+                            provider,
+                            attempt = attempt + 1,
+                            total_attempts = retry_attempts,
+                            query,
+                            error = %error,
+                            "web_search provider attempt failed"
+                        );
                         provider_errors.push(format!(
                             "{provider} attempt {}/{}: {}",
                             attempt + 1,
@@ -926,6 +945,12 @@ impl Tool for WebSearchTool {
         }
 
         let result = result.ok_or_else(|| {
+            tracing::error!(
+                query,
+                provider_chain = ?providers,
+                errors = %provider_errors.join(" | "),
+                "all configured web_search providers failed"
+            );
             anyhow::anyhow!(
                 "All configured web_search providers failed: {}",
                 provider_errors.join(" | ")
@@ -1150,12 +1175,21 @@ mod tests {
             "test".to_string(),
         );
         let result = tool.execute(json!({"query": "test"})).await;
-        assert!(result.is_err());
-        let error = result.unwrap_err().to_string();
-        if cfg!(feature = "firecrawl") {
-            assert!(error.contains("api_key"));
-        } else {
-            assert!(error.contains("requires Cargo feature 'firecrawl'"));
+        match result {
+            Ok(result) => {
+                assert!(
+                    result.success,
+                    "implicit fallback should return a successful result when available"
+                );
+            }
+            Err(error) => {
+                let error = error.to_string();
+                if cfg!(feature = "firecrawl") {
+                    assert!(error.contains("api_key"));
+                } else {
+                    assert!(error.contains("requires Cargo feature 'firecrawl'"));
+                }
+            }
         }
     }
 
@@ -1237,6 +1271,37 @@ mod tests {
             tool.provider_chain().unwrap(),
             vec!["duckduckgo", "tavily", "brave"]
         );
+    }
+
+    #[test]
+    fn provider_chain_adds_implicit_duckduckgo_fallback_for_firecrawl() {
+        let tool = WebSearchTool::new_with_options(
+            test_security(),
+            "firecrawl".to_string(),
+            Some("key".to_string()),
+            None,
+            None,
+            None,
+            None,
+            Some("http://127.0.0.1:3002/v1".to_string()),
+            5,
+            15,
+            "test".to_string(),
+            Vec::new(),
+            0,
+            250,
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+            None,
+            None,
+            "auto".to_string(),
+            false,
+            Vec::new(),
+        );
+
+        assert_eq!(tool.provider_chain().unwrap(), vec!["firecrawl", "duckduckgo"]);
     }
 
     #[test]
