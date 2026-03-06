@@ -31,7 +31,7 @@ on:
 
 concurrency:
     group: release-${{ github.ref || github.run_id }}
-    cancel-in-progress: false
+    cancel-in-progress: true
 
 permissions:
     contents: write
