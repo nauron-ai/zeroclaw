@@ -726,32 +726,20 @@ fn integration_settings_fields(
         }
         inception::DASHBOARD_INTEGRATION_NAME => {
             let has_key = config.api_key.is_some();
-            let fields = vec![
-                serde_json::json!({
-                    "key": "api_key",
-                    "label": "API Key",
-                    "required": true,
-                    "has_value": has_key,
-                    "input_type": "secret",
-                    "options": [],
-                    "masked_value": if has_key { Some(MASKED_SECRET) } else { None },
-                }),
-                serde_json::json!({
-                    "key": "default_model",
-                    "label": "Default Model",
-                    "required": false,
-                    "has_value": config.default_model.is_some(),
-                    "input_type": "select",
-                    "options": inception::DASHBOARD_MODEL_OPTIONS,
-                    "current_value": config.default_model.as_deref().unwrap_or(""),
-                }),
-            ];
+            let fields = inception::dashboard_fields(
+                has_key,
+                config.default_model.as_deref(),
+                MASKED_SECRET,
+            )
+            .into_iter()
+            .map(|field| {
+                serde_json::to_value(field)
+                    .expect("inception dashboard field contract should serialize")
+            })
+            .collect();
             (has_key, fields)
         }
-        _ => {
-            // Default: no configurable fields
-            (false, vec![])
-        }
+        _ => (false, vec![]),
     }
 }
 
