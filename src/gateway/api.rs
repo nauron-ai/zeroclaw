@@ -2,16 +2,16 @@
 //!
 //! All `/api/*` routes require bearer token authentication (PairingGuard).
 
-use super::{
-    dashboard_integrations::{self, IntegrationCredentialsUpdateRequest, MASKED_SECRET},
-    mock_dashboard, AppState,
-};
+use super::{mock_dashboard, AppState};
+use crate::providers::inception;
 use axum::{
     extract::{Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Json},
 };
 use serde::Deserialize;
+
+const MASKED_SECRET: &str = "***MASKED***";
 
 // ── Bearer token auth extractor ─────────────────────────────────
 
@@ -351,10 +351,20 @@ pub async fn handle_api_integrations(
     let config = state.config.lock().clone();
     let entries = crate::integrations::registry::all_integrations();
 
-    Json(dashboard_integrations::build_integrations_response(
-        &config, &entries,
-    ))
-    .into_response()
+    let integrations: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|entry| {
+            let status = (entry.status_fn)(&config);
+            serde_json::json!({
+                "name": entry.name,
+                "description": entry.description,
+                "category": entry.category,
+                "status": status,
+            })
+        })
+        .collect();
+
+    Json(serde_json::json!({"integrations": integrations})).into_response()
 }
 
 /// GET /api/integrations/settings — detailed settings for each integration
@@ -372,9 +382,36 @@ pub async fn handle_api_integrations_settings(
     let config = state.config.lock().clone();
     let entries = crate::integrations::registry::all_integrations();
 
-    Json(dashboard_integrations::build_integration_settings_response(
-        &config, &entries,
-    ))
+    let active_default_provider_id = config
+        .default_provider
+        .as_ref()
+        .and_then(|p| integration_id_from_provider(p));
+
+    let integrations: Vec<serde_json::Value> = entries
+        .iter()
+        .map(|entry| {
+            let status = (entry.status_fn)(&config);
+            let (configured, fields) = integration_settings_fields(&config, entry.name);
+            let activates_default_provider = is_ai_provider(entry.name);
+
+            serde_json::json!({
+                "id": integration_name_to_id(entry.name),
+                "name": entry.name,
+                "description": entry.description,
+                "category": entry.category,
+                "status": status,
+                "configured": configured,
+                "activates_default_provider": activates_default_provider,
+                "fields": fields,
+            })
+        })
+        .collect();
+
+    Json(serde_json::json!({
+        "revision": "v1",
+        "active_default_provider_integration_id": active_default_provider_id,
+        "integrations": integrations,
+    }))
     .into_response()
 }
 
@@ -383,34 +420,96 @@ pub async fn handle_api_integrations_credentials_put(
     State(state): State<AppState>,
     headers: HeaderMap,
     Path(id): Path<String>,
-    Json(body): Json<IntegrationCredentialsUpdateRequest>,
+    Json(body): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     if let Err(e) = require_auth(&state, &headers) {
         return e.into_response();
     }
     if mock_dashboard::is_enabled(&headers) {
-        let body = match serde_json::to_value(&body) {
-            Ok(body) => body,
-            Err(error) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": format!("Failed to serialize integration update: {error}")
-                    })),
-                )
-                    .into_response()
-            }
-        };
         return mock_dashboard::integrations_credentials_put(&id, &body);
     }
 
+    let fields = body
+        .get("fields")
+        .and_then(|v| v.as_object())
+        .cloned()
+        .unwrap_or_default();
+
     let mut config = state.config.lock().clone();
-    if let Err(error) = dashboard_integrations::apply_credentials_update(&mut config, &id, &body) {
+    let Some(provider_key) = provider_key_from_integration_id(&id) else {
         return (
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": error })),
+            Json(serde_json::json!({
+                "error": format!(
+                    "Integration '{}' does not support credential updates via this endpoint",
+                    id
+                )
+            })),
         )
             .into_response();
+    };
+
+    // Apply credential updates based on integration
+    match provider_key {
+        "openrouter"
+        | "anthropic"
+        | "openai"
+        | "google"
+        | "deepseek"
+        | "xai"
+        | "mistral"
+        | "perplexity"
+        | "vercel"
+        | "bedrock"
+        | "groq"
+        | "together"
+        | "cohere"
+        | "fireworks"
+        | "venice"
+        | "moonshot"
+        | "stepfun"
+        | "synthetic"
+        | "opencode"
+        | "zai"
+        | "glm"
+        | "minimax"
+        | "qwen"
+        | "qianfan"
+        | "doubao"
+        | "volcengine"
+        | "ark"
+        | "siliconflow"
+        | inception::CANONICAL_NAME => {
+            if let Some(api_key) = fields.get("api_key").and_then(|v| v.as_str()) {
+                if !api_key.is_empty() && api_key != MASKED_SECRET {
+                    config.api_key = Some(api_key.to_string());
+                }
+            }
+            if let Some(default_model) = fields.get("default_model").and_then(|v| v.as_str()) {
+                if !default_model.is_empty() {
+                    config.default_model = Some(default_model.to_string());
+                }
+            }
+            config.default_provider = Some(provider_key.to_string());
+        }
+        "ollama" => {
+            if let Some(default_model) = fields.get("default_model").and_then(|v| v.as_str()) {
+                if !default_model.is_empty() {
+                    config.default_model = Some(default_model.to_string());
+                }
+            }
+            config.default_provider = Some("ollama".to_string());
+        }
+        _ => {
+            // Channel integrations - not implemented for credentials update via this endpoint
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": format!("Integration '{}' does not support credential updates via this endpoint", id)
+                })),
+            )
+                .into_response();
+        }
     }
 
     // Save config
@@ -430,6 +529,230 @@ pub async fn handle_api_integrations_credentials_put(
         "revision": "v1",
     }))
     .into_response()
+}
+
+fn integration_name_to_id(name: &str) -> String {
+    name.to_lowercase()
+        .replace(' ', "-")
+        .replace(['/', '.'], "-")
+}
+
+fn provider_key_from_integration_id(id: &str) -> Option<&'static str> {
+    match id {
+        "openrouter" => Some("openrouter"),
+        "anthropic" => Some("anthropic"),
+        "openai" => Some("openai"),
+        "google" => Some("google"),
+        "deepseek" => Some("deepseek"),
+        "xai" => Some("xai"),
+        "mistral" => Some("mistral"),
+        "perplexity" => Some("perplexity"),
+        "vercel-ai" => Some("vercel"),
+        "amazon-bedrock" => Some("bedrock"),
+        "groq" => Some("groq"),
+        "together-ai" => Some("together"),
+        "cohere" => Some("cohere"),
+        "fireworks-ai" => Some("fireworks"),
+        "venice" => Some("venice"),
+        "moonshot" => Some("moonshot"),
+        "stepfun" => Some("stepfun"),
+        "synthetic" => Some("synthetic"),
+        "opencode-zen" => Some("opencode"),
+        "z-ai" => Some("zai"),
+        "glm" => Some("glm"),
+        "minimax" => Some("minimax"),
+        "qwen" => Some("qwen"),
+        "qianfan" => Some("qianfan"),
+        "volcengine-ark" => Some("ark"),
+        "siliconflow" => Some("siliconflow"),
+        "ollama" => Some("ollama"),
+        inception::CANONICAL_NAME => Some(inception::CANONICAL_NAME),
+        _ => None,
+    }
+}
+
+fn is_ai_provider(name: &str) -> bool {
+    matches!(
+        name,
+        "OpenRouter"
+            | "Anthropic"
+            | "OpenAI"
+            | "Google"
+            | "DeepSeek"
+            | "xAI"
+            | "Mistral"
+            | "Perplexity"
+            | "Vercel AI"
+            | "Amazon Bedrock"
+            | "Groq"
+            | "Together AI"
+            | "Cohere"
+            | "Fireworks AI"
+            | "Venice"
+            | "Moonshot"
+            | "StepFun"
+            | "Synthetic"
+            | "OpenCode Zen"
+            | "Z.AI"
+            | "GLM"
+            | "MiniMax"
+            | "Qwen"
+            | "Qianfan"
+            | "Volcengine ARK"
+            | "SiliconFlow"
+            | inception::DASHBOARD_INTEGRATION_NAME
+            | "Ollama"
+    )
+}
+
+fn integration_id_from_provider(provider: &str) -> Option<String> {
+    let name = match provider {
+        "openrouter" => "OpenRouter",
+        "anthropic" => "Anthropic",
+        "openai" => "OpenAI",
+        "google" | "vertex" => "Google",
+        "deepseek" => "DeepSeek",
+        "xai" | "x-ai" => "xAI",
+        "mistral" => "Mistral",
+        "perplexity" => "Perplexity",
+        "vercel" => "Vercel AI",
+        "bedrock" => "Amazon Bedrock",
+        "groq" => "Groq",
+        "together" => "Together AI",
+        "cohere" => "Cohere",
+        "fireworks" => "Fireworks AI",
+        "venice" => "Venice",
+        "moonshot" | "moonshot-cn" | "moonshot-intl" => "Moonshot",
+        "stepfun" | "step-ai" => "StepFun",
+        "synthetic" => "Synthetic",
+        "opencode" => "OpenCode Zen",
+        "zai" | "zai-cn" | "zai-intl" => "Z.AI",
+        "glm" | "glm-cn" | "glm-intl" => "GLM",
+        "minimax" | "minimax-cn" | "minimax-intl" => "MiniMax",
+        "qwen" | "qwen-cn" | "qwen-intl" => "Qwen",
+        "qianfan" | "baidu" => "Qianfan",
+        "doubao" | "volcengine" | "ark" => "Volcengine ARK",
+        "siliconflow" | "silicon-cloud" => "SiliconFlow",
+        provider if inception::is_alias(provider) => inception::DASHBOARD_INTEGRATION_NAME,
+        "ollama" => "Ollama",
+        _ => return None,
+    };
+    Some(integration_name_to_id(name))
+}
+
+#[allow(clippy::too_many_lines)]
+fn integration_settings_fields(
+    config: &crate::config::Config,
+    name: &str,
+) -> (bool, Vec<serde_json::Value>) {
+    match name {
+        "OpenRouter" => {
+            let has_key = config.api_key.is_some();
+            let fields = vec![
+                serde_json::json!({
+                    "key": "api_key",
+                    "label": "API Key",
+                    "required": true,
+                    "has_value": has_key,
+                    "input_type": "secret",
+                    "options": [],
+                    "masked_value": if has_key { Some(MASKED_SECRET) } else { None },
+                }),
+                serde_json::json!({
+                    "key": "default_model",
+                    "label": "Default Model",
+                    "required": false,
+                    "has_value": config.default_model.is_some(),
+                    "input_type": "select",
+                    "options": [
+                        "anthropic/claude-sonnet-4-6",
+                        "openai/gpt-5.2",
+                        "google/gemini-3.1-pro",
+                        "deepseek/deepseek-reasoner",
+                        "x-ai/grok-4",
+                    ],
+                    "current_value": config.default_model.as_deref().unwrap_or(""),
+                }),
+            ];
+            (has_key, fields)
+        }
+        "Anthropic" => {
+            let has_key = config.api_key.is_some();
+            let fields = vec![
+                serde_json::json!({
+                    "key": "api_key",
+                    "label": "API Key",
+                    "required": true,
+                    "has_value": has_key,
+                    "input_type": "secret",
+                    "options": [],
+                    "masked_value": if has_key { Some(MASKED_SECRET) } else { None },
+                }),
+                serde_json::json!({
+                    "key": "default_model",
+                    "label": "Default Model",
+                    "required": false,
+                    "has_value": config.default_model.is_some(),
+                    "input_type": "select",
+                    "options": ["claude-sonnet-4-6", "claude-opus-4-6"],
+                    "current_value": config.default_model.as_deref().unwrap_or(""),
+                }),
+            ];
+            (has_key, fields)
+        }
+        "OpenAI" => {
+            let has_key = config.api_key.is_some();
+            let fields = vec![
+                serde_json::json!({
+                    "key": "api_key",
+                    "label": "API Key",
+                    "required": true,
+                    "has_value": has_key,
+                    "input_type": "secret",
+                    "options": [],
+                    "masked_value": if has_key { Some(MASKED_SECRET) } else { None },
+                }),
+                serde_json::json!({
+                    "key": "default_model",
+                    "label": "Default Model",
+                    "required": false,
+                    "has_value": config.default_model.is_some(),
+                    "input_type": "select",
+                    "options": ["gpt-5.2", "gpt-5.2-codex", "gpt-4o"],
+                    "current_value": config.default_model.as_deref().unwrap_or(""),
+                }),
+            ];
+            (has_key, fields)
+        }
+        inception::DASHBOARD_INTEGRATION_NAME => {
+            let has_key = config.api_key.is_some();
+            let fields = vec![
+                serde_json::json!({
+                    "key": "api_key",
+                    "label": "API Key",
+                    "required": true,
+                    "has_value": has_key,
+                    "input_type": "secret",
+                    "options": [],
+                    "masked_value": if has_key { Some(MASKED_SECRET) } else { None },
+                }),
+                serde_json::json!({
+                    "key": "default_model",
+                    "label": "Default Model",
+                    "required": false,
+                    "has_value": config.default_model.is_some(),
+                    "input_type": "select",
+                    "options": inception::DASHBOARD_MODEL_OPTIONS,
+                    "current_value": config.default_model.as_deref().unwrap_or(""),
+                }),
+            ];
+            (has_key, fields)
+        }
+        _ => {
+            // Default: no configurable fields
+            (false, vec![])
+        }
+    }
 }
 
 /// POST /api/doctor — run diagnostics
@@ -1423,34 +1746,28 @@ mod tests {
 
     #[test]
     fn provider_key_from_integration_id_maps_dashboard_ids() {
+        assert_eq!(provider_key_from_integration_id("openai"), Some("openai"));
         assert_eq!(
-            dashboard_integrations::provider_key_from_integration_id("openai"),
-            Some("openai")
-        );
-        assert_eq!(
-            dashboard_integrations::provider_key_from_integration_id("inception"),
-            Some("inception")
-        );
-        assert_eq!(
-            dashboard_integrations::provider_key_from_integration_id("amazon-bedrock"),
+            provider_key_from_integration_id("amazon-bedrock"),
             Some("bedrock")
         );
         assert_eq!(
-            dashboard_integrations::provider_key_from_integration_id("together-ai"),
+            provider_key_from_integration_id("together-ai"),
             Some("together")
         );
         assert_eq!(
-            dashboard_integrations::provider_key_from_integration_id("opencode-zen"),
+            provider_key_from_integration_id("opencode-zen"),
             Some("opencode")
         );
         assert_eq!(
-            dashboard_integrations::provider_key_from_integration_id("volcengine-ark"),
+            provider_key_from_integration_id("volcengine-ark"),
             Some("ark")
         );
         assert_eq!(
-            dashboard_integrations::provider_key_from_integration_id("slack"),
-            None
+            provider_key_from_integration_id(inception::CANONICAL_NAME),
+            Some(inception::CANONICAL_NAME)
         );
+        assert_eq!(provider_key_from_integration_id("slack"), None);
     }
 
     #[test]
@@ -1459,7 +1776,6 @@ mod tests {
             ("openrouter", "openrouter"),
             ("anthropic", "anthropic"),
             ("openai", "openai"),
-            ("inception", "inception"),
             ("google", "google"),
             ("deepseek", "deepseek"),
             ("xai", "xai"),
@@ -1483,14 +1799,15 @@ mod tests {
             ("qianfan", "qianfan"),
             ("ark", "ark"),
             ("siliconflow", "siliconflow"),
+            (inception::CANONICAL_NAME, inception::CANONICAL_NAME),
             ("ollama", "ollama"),
         ];
 
         for (provider, expected_provider_key) in cases {
-            let id = dashboard_integrations::integration_id_from_provider(provider)
+            let id = integration_id_from_provider(provider)
                 .expect("provider should map to dashboard integration id");
             assert_eq!(
-                dashboard_integrations::provider_key_from_integration_id(&id),
+                provider_key_from_integration_id(&id),
                 Some(expected_provider_key),
                 "provider '{provider}' with id '{id}' should resolve to '{expected_provider_key}'",
             );
@@ -1498,14 +1815,10 @@ mod tests {
     }
 
     #[test]
-    fn integration_provider_mapping_accepts_aliases() {
+    fn inception_alias_maps_to_dashboard_integration_id() {
         assert_eq!(
-            dashboard_integrations::integration_id_from_provider("inceptionlabs"),
-            Some("inception".to_string())
-        );
-        assert_eq!(
-            dashboard_integrations::integration_id_from_provider("gemini"),
-            Some("google".to_string())
+            integration_id_from_provider(inception::ALIASES[0]).as_deref(),
+            Some(inception::CANONICAL_NAME)
         );
     }
 }
