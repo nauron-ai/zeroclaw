@@ -2,7 +2,7 @@
 
 Tài liệu này liệt kê các provider ID, alias và biến môi trường chứa thông tin xác thực.
 
-Cập nhật lần cuối: **2026-03-01**.
+Cập nhật lần cuối: **2026-03-08**.
 
 ## Cách liệt kê các Provider
 
@@ -18,6 +18,9 @@ Thứ tự ưu tiên tại runtime:
 2. Biến môi trường dành riêng cho provider
 3. Biến môi trường dự phòng chung: `ZEROCLAW_API_KEY`, sau đó là `API_KEY`
 
+Ngoại lệ: `inception` cố ý không dùng fallback `ZEROCLAW_API_KEY` hoặc
+`API_KEY`. Hãy dùng credential tường minh hoặc `INCEPTION_API_KEY`.
+
 Với chuỗi provider dự phòng (`reliability.fallback_providers`), mỗi provider dự phòng tự giải quyết thông tin xác thực của mình độc lập. Key xác thực của provider chính không tự động dùng cho provider dự phòng.
 
 ## Danh mục Provider
@@ -27,6 +30,7 @@ Với chuỗi provider dự phòng (`reliability.fallback_providers`), mỗi pro
 | `openrouter` | — | Không | `OPENROUTER_API_KEY` |
 | `anthropic` | — | Không | `ANTHROPIC_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` |
 | `openai` | — | Không | `OPENAI_API_KEY` |
+| `inception` | `inceptionlabs` | Không | `INCEPTION_API_KEY` |
 | `ollama` | — | Có | `OLLAMA_API_KEY` (tùy chọn) |
 | `gemini` | `google`, `google-gemini` | Không | `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
 | `venice` | — | Không | `VENICE_API_KEY` |
@@ -63,6 +67,23 @@ Với chuỗi provider dự phòng (`reliability.fallback_providers`), mỗi pro
 - Xác thực có thể dùng `GEMINI_API_KEY`, `GOOGLE_API_KEY`, hoặc Gemini CLI OAuth cache (`~/.gemini/oauth_creds.json`)
 - Request bằng API key dùng endpoint `generativelanguage.googleapis.com/v1beta`
 - Request OAuth qua Gemini CLI dùng endpoint `cloudcode-pa.googleapis.com/v1internal` theo chuẩn Code Assist request envelope
+
+### Ghi chú về Inception Labs
+
+- Provider ID: `inception` (alias: `inceptionlabs`)
+- Base API URL: `https://api.inceptionlabs.ai/v1`
+- Endpoints: `POST /v1/chat/completions`, `GET /v1/models`
+- Biến xác thực: `INCEPTION_API_KEY`
+- Không dùng fallback `ZEROCLAW_API_KEY` / `API_KEY`
+- Model mặc định: `mercury-2`
+
+Kiểm tra nhanh:
+
+```bash
+export INCEPTION_API_KEY="your-inception-api-key"
+zeroclaw models refresh --provider inception
+zeroclaw agent --provider inception --model mercury-2 -m "ping"
+```
 
 ### Ghi chú về Volcengine ARK (Doubao)
 

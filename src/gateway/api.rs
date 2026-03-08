@@ -450,10 +450,11 @@ pub async fn handle_api_integrations_credentials_put(
 
     // Apply credential updates based on integration
     match provider_key {
-        "openrouter" | "anthropic" | "openai" | "google" | "deepseek" | "xai" | "mistral"
-        | "perplexity" | "vercel" | "bedrock" | "groq" | "together" | "cohere" | "fireworks"
-        | "venice" | "moonshot" | "stepfun" | "synthetic" | "opencode" | "zai" | "glm"
-        | "minimax" | "qwen" | "qianfan" | "doubao" | "volcengine" | "ark" | "siliconflow" => {
+        "openrouter" | "anthropic" | "openai" | "inception" | "google" | "deepseek" | "xai"
+        | "mistral" | "perplexity" | "vercel" | "bedrock" | "groq" | "together" | "cohere"
+        | "fireworks" | "venice" | "moonshot" | "stepfun" | "synthetic" | "opencode" | "zai"
+        | "glm" | "minimax" | "qwen" | "qianfan" | "doubao" | "volcengine" | "ark"
+        | "siliconflow" => {
             if let Some(api_key) = fields.get("api_key").and_then(|v| v.as_str()) {
                 if !api_key.is_empty() && api_key != MASKED_SECRET {
                     config.api_key = Some(api_key.to_string());
@@ -516,6 +517,7 @@ fn provider_key_from_integration_id(id: &str) -> Option<&'static str> {
         "openrouter" => Some("openrouter"),
         "anthropic" => Some("anthropic"),
         "openai" => Some("openai"),
+        "inception" => Some("inception"),
         "google" => Some("google"),
         "deepseek" => Some("deepseek"),
         "xai" => Some("xai"),
@@ -550,6 +552,7 @@ fn is_ai_provider(name: &str) -> bool {
         "OpenRouter"
             | "Anthropic"
             | "OpenAI"
+            | "Inception"
             | "Google"
             | "DeepSeek"
             | "xAI"
@@ -582,6 +585,7 @@ fn integration_id_from_provider(provider: &str) -> Option<String> {
         "openrouter" => "OpenRouter",
         "anthropic" => "Anthropic",
         "openai" => "OpenAI",
+        "inception" | "inceptionlabs" => "Inception",
         "google" | "vertex" => "Google",
         "deepseek" => "DeepSeek",
         "xai" | "x-ai" => "xAI",
@@ -690,6 +694,30 @@ fn integration_settings_fields(
                     "has_value": config.default_model.is_some(),
                     "input_type": "select",
                     "options": ["gpt-5.2", "gpt-5.2-codex", "gpt-4o"],
+                    "current_value": config.default_model.as_deref().unwrap_or(""),
+                }),
+            ];
+            (has_key, fields)
+        }
+        "Inception" => {
+            let has_key = config.api_key.is_some();
+            let fields = vec![
+                serde_json::json!({
+                    "key": "api_key",
+                    "label": "API Key",
+                    "required": true,
+                    "has_value": has_key,
+                    "input_type": "secret",
+                    "options": [],
+                    "masked_value": if has_key { Some(MASKED_SECRET) } else { None },
+                }),
+                serde_json::json!({
+                    "key": "default_model",
+                    "label": "Default Model",
+                    "required": false,
+                    "has_value": config.default_model.is_some(),
+                    "input_type": "select",
+                    "options": ["mercury-2"],
                     "current_value": config.default_model.as_deref().unwrap_or(""),
                 }),
             ];
@@ -1695,6 +1723,10 @@ mod tests {
     fn provider_key_from_integration_id_maps_dashboard_ids() {
         assert_eq!(provider_key_from_integration_id("openai"), Some("openai"));
         assert_eq!(
+            provider_key_from_integration_id("inception"),
+            Some("inception")
+        );
+        assert_eq!(
             provider_key_from_integration_id("amazon-bedrock"),
             Some("bedrock")
         );
@@ -1719,6 +1751,7 @@ mod tests {
             ("openrouter", "openrouter"),
             ("anthropic", "anthropic"),
             ("openai", "openai"),
+            ("inception", "inception"),
             ("google", "google"),
             ("deepseek", "deepseek"),
             ("xai", "xai"),

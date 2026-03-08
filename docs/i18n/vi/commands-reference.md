@@ -2,7 +2,7 @@
 
 Dựa trên CLI hiện tại (`zeroclaw --help`).
 
-Xác minh lần cuối: **2026-03-04**.
+Xác minh lần cuối: **2026-03-08**.
 
 ## Lệnh cấp cao nhất
 
@@ -93,7 +93,7 @@ Ghi chú:
 - `zeroclaw models refresh --provider <ID>`
 - `zeroclaw models refresh --force`
 
-`models refresh` hiện hỗ trợ làm mới danh mục trực tiếp cho các provider: `openrouter`, `openai`, `anthropic`, `groq`, `mistral`, `deepseek`, `xai`, `together-ai`, `gemini`, `ollama`, `llamacpp`, `sglang`, `vllm`, `astrai`, `venice`, `fireworks`, `cohere`, `moonshot`, `stepfun`, `glm`, `zai`, `qwen`, `volcengine` (alias `doubao`/`ark`), `siliconflow` và `nvidia`.
+`models refresh` hiện hỗ trợ làm mới danh mục trực tiếp cho các provider: `openrouter`, `openai`, `inception`, `anthropic`, `groq`, `mistral`, `deepseek`, `xai`, `together-ai`, `gemini`, `ollama`, `llamacpp`, `sglang`, `vllm`, `astrai`, `venice`, `fireworks`, `cohere`, `moonshot`, `stepfun`, `glm`, `zai`, `qwen`, `volcengine` (alias `doubao`/`ark`), `siliconflow` và `nvidia`.
 
 ### `channel`
 

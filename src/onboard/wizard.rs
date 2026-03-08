@@ -980,6 +980,7 @@ fn canonical_provider_name(provider_name: &str) -> &str {
         "google" | "google-gemini" => "gemini",
         "github-copilot" => "copilot",
         "openai_codex" | "codex" => "openai-codex",
+        "inceptionlabs" => "inception",
         "kimi_coding" | "kimi_for_coding" => "kimi-code",
         "nvidia-nim" | "build.nvidia.com" => "nvidia",
         "aws-bedrock" => "bedrock",
@@ -1021,6 +1022,7 @@ fn default_model_for_provider(provider: &str) -> String {
         "anthropic" => "claude-sonnet-4-5-20250929".into(),
         "openai" => "gpt-5.2".into(),
         "openai-codex" => "gpt-5-codex".into(),
+        "inception" => crate::providers::inception::INCEPTION_DEFAULT_MODEL.into(),
         "venice" => "zai-org-glm-5".into(),
         "groq" => "llama-3.3-70b-versatile".into(),
         "mistral" => "mistral-large-latest".into(),
@@ -1147,6 +1149,10 @@ fn curated_models_for_provider(provider_name: &str) -> Vec<(String, String)> {
             ),
             ("o4-mini".to_string(), "o4-mini (fallback)".to_string()),
         ],
+        "inception" => vec![(
+            crate::providers::inception::INCEPTION_DEFAULT_MODEL.to_string(),
+            "Mercury 2 (recommended, ultra-low latency)".to_string(),
+        )],
         "venice" => vec![
             (
                 "zai-org-glm-5".to_string(),
@@ -1554,6 +1560,7 @@ fn supports_live_model_fetch(provider_name: &str) -> bool {
         "openrouter"
             | "openai-codex"
             | "openai"
+            | "inception"
             | "anthropic"
             | "groq"
             | "mistral"
@@ -1595,6 +1602,7 @@ fn models_endpoint_for_provider(provider_name: &str) -> Option<&'static str> {
         }
         _ => match canonical_provider_name(provider_name) {
             "openai-codex" | "openai" => Some("https://api.openai.com/v1/models"),
+            "inception" => Some(crate::providers::inception::INCEPTION_MODELS_URL),
             "venice" => Some("https://api.venice.ai/api/v1/models"),
             "groq" => Some("https://api.groq.com/openai/v1/models"),
             "mistral" => Some("https://api.mistral.ai/v1/models"),
@@ -1875,7 +1883,10 @@ fn resolve_live_models_endpoint(
         }
     }
 
-    if canonical_provider_name(provider_name) == "openai-codex" {
+    if matches!(
+        canonical_provider_name(provider_name),
+        "openai-codex" | "inception"
+    ) {
         if let Some(url) = provider_api_url
             .map(str::trim)
             .filter(|url| !url.is_empty())
@@ -2558,6 +2569,10 @@ async fn setup_provider(workspace_dir: &Path) -> Result<(String, String, String,
             ("anthropic", "Anthropic — Claude Sonnet & Opus (direct)"),
             ("openai", "OpenAI — GPT-4o, o1, GPT-5 (direct)"),
             (
+                "inception",
+                "Inception Labs — Mercury 2 (ultra-low latency)",
+            ),
+            (
                 "openai-codex",
                 "OpenAI Codex (ChatGPT subscription OAuth, no API key)",
             ),
@@ -3026,6 +3041,8 @@ async fn setup_provider(workspace_dir: &Path) -> Result<(String, String, String,
             "https://cloud.siliconflow.cn/account/ak"
         } else if is_stepfun_alias(provider_name) {
             "https://platform.stepfun.com/interface-key"
+        } else if canonical_provider_name(provider_name) == "inception" {
+            "https://platform.inceptionlabs.ai/"
         } else {
             match provider_name {
                 "openrouter" => "https://openrouter.ai/keys",
@@ -3317,6 +3334,7 @@ fn provider_env_var(name: &str) -> &'static str {
         "openrouter" => "OPENROUTER_API_KEY",
         "anthropic" => "ANTHROPIC_API_KEY",
         "openai-codex" | "openai" => "OPENAI_API_KEY",
+        "inception" => "INCEPTION_API_KEY",
         "ollama" => "OLLAMA_API_KEY",
         "llamacpp" => "LLAMACPP_API_KEY",
         "sglang" => "SGLANG_API_KEY",
@@ -7873,6 +7891,7 @@ mod tests {
         );
         assert_eq!(default_model_for_provider("openai"), "gpt-5.2");
         assert_eq!(default_model_for_provider("openai-codex"), "gpt-5-codex");
+        assert_eq!(default_model_for_provider("inception"), "mercury-2");
         assert_eq!(
             default_model_for_provider("anthropic"),
             "claude-sonnet-4-5-20250929"
@@ -7941,6 +7960,7 @@ mod tests {
         assert_eq!(canonical_provider_name("qwen-oauth"), "qwen-code");
         assert_eq!(canonical_provider_name("codex"), "openai-codex");
         assert_eq!(canonical_provider_name("openai_codex"), "openai-codex");
+        assert_eq!(canonical_provider_name("inceptionlabs"), "inception");
         assert_eq!(canonical_provider_name("moonshot-intl"), "moonshot");
         assert_eq!(canonical_provider_name("kimi-cn"), "moonshot");
         assert_eq!(canonical_provider_name("step"), "stepfun");
@@ -8133,6 +8153,7 @@ mod tests {
     #[test]
     fn supports_live_model_fetch_for_supported_and_unsupported_providers() {
         assert!(supports_live_model_fetch("openai"));
+        assert!(supports_live_model_fetch("inception"));
         assert!(supports_live_model_fetch("anthropic"));
         assert!(supports_live_model_fetch("gemini"));
         assert!(supports_live_model_fetch("google"));
@@ -8180,6 +8201,10 @@ mod tests {
         assert_eq!(
             curated_models_for_provider("gemini"),
             curated_models_for_provider("google-gemini")
+        );
+        assert_eq!(
+            curated_models_for_provider("inception"),
+            curated_models_for_provider("inceptionlabs")
         );
         assert_eq!(
             curated_models_for_provider("qwen"),
@@ -8292,6 +8317,10 @@ mod tests {
         assert_eq!(
             models_endpoint_for_provider("openai-codex"),
             Some("https://api.openai.com/v1/models")
+        );
+        assert_eq!(
+            models_endpoint_for_provider("inception"),
+            Some("https://api.inceptionlabs.ai/v1/models")
         );
         assert_eq!(
             models_endpoint_for_provider("venice"),
@@ -8596,6 +8625,7 @@ mod tests {
         assert_eq!(provider_env_var("anthropic"), "ANTHROPIC_API_KEY");
         assert_eq!(provider_env_var("openai-codex"), "OPENAI_API_KEY");
         assert_eq!(provider_env_var("openai"), "OPENAI_API_KEY");
+        assert_eq!(provider_env_var("inception"), "INCEPTION_API_KEY");
         assert_eq!(provider_env_var("ollama"), "OLLAMA_API_KEY");
         assert_eq!(provider_env_var("llamacpp"), "LLAMACPP_API_KEY");
         assert_eq!(provider_env_var("llama.cpp"), "LLAMACPP_API_KEY");

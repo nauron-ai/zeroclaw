@@ -2,7 +2,7 @@
 
 This document maps provider IDs, aliases, and credential environment variables.
 
-Last verified: **March 1, 2026**.
+Last verified: **March 8, 2026**.
 
 ## How to List Providers
 
@@ -18,6 +18,9 @@ Runtime resolution order is:
 2. Provider-specific env var(s)
 3. Generic fallback env vars: `ZEROCLAW_API_KEY` then `API_KEY`
 
+Exception: `inception` intentionally does not fall back to `ZEROCLAW_API_KEY`
+or `API_KEY`. Use an explicit credential or `INCEPTION_API_KEY`.
+
 For resilient fallback chains (`reliability.fallback_providers`), each fallback
 provider resolves credentials independently. The primary provider's explicit
 credential is not reused for fallback providers.
@@ -29,6 +32,7 @@ credential is not reused for fallback providers.
 | `openrouter` | — | No | `OPENROUTER_API_KEY` |
 | `anthropic` | — | No | `ANTHROPIC_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` |
 | `openai` | — | No | `OPENAI_API_KEY` |
+| `inception` | `inceptionlabs` | No | `INCEPTION_API_KEY` |
 | `ollama` | — | Yes | `OLLAMA_API_KEY` (optional) |
 | `gemini` | `google`, `google-gemini` | No | `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
 | `venice` | — | No | `VENICE_API_KEY` |
@@ -99,6 +103,31 @@ default_model = "qwen2.5-coder:7b"
 - Authentication: `VERCEL_API_KEY`
 - Vercel AI Gateway usage does not require a project deployment.
 - If you see `DEPLOYMENT_NOT_FOUND`, verify the provider is targeting the gateway endpoint above instead of `https://api.vercel.ai`.
+
+### Inception Labs Notes
+
+- Provider ID: `inception` (alias: `inceptionlabs`)
+- Base API URL: `https://api.inceptionlabs.ai/v1`
+- Chat endpoint: `/chat/completions`
+- Model discovery endpoint: `/models`
+- Authentication: `INCEPTION_API_KEY`
+- Generic `ZEROCLAW_API_KEY` / `API_KEY` fallback is intentionally disabled for this provider
+- Default model preset: `mercury-2`
+- Runtime contract: text + native tools + streaming use the OpenAI-compatible path; vision remains disabled until explicitly validated upstream
+
+Minimal setup example:
+
+```bash
+export INCEPTION_API_KEY="your-inception-api-key"
+zeroclaw onboard --provider inception --api-key "$INCEPTION_API_KEY" --model mercury-2 --force
+```
+
+Quick validation:
+
+```bash
+zeroclaw models refresh --provider inception
+zeroclaw agent --provider inception --model mercury-2 -m "ping"
+```
 
 ### Gemini Notes
 

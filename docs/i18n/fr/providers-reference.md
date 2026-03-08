@@ -21,6 +21,7 @@ Source anglaise:
 
 - Ajout d'un réglage `provider.reasoning_level` pour le niveau de raisonnement OpenAI Codex. Voir la source anglaise pour les détails.
 - 2026-03-01: ajout de la prise en charge du provider StepFun (`stepfun`, alias `step`, `step-ai`, `step_ai`).
+- 2026-03-08: ajout du provider Inception Labs (`inception`, alias `inceptionlabs`).
 
 ## StepFun (Résumé)
 
@@ -37,4 +38,22 @@ Validation rapide:
 export STEP_API_KEY="your-stepfun-api-key"
 zeroclaw models refresh --provider stepfun
 zeroclaw agent --provider stepfun --model step-3.5-flash -m "ping"
+```
+
+## Inception Labs (Résumé)
+
+- Provider ID: `inception`
+- Alias: `inceptionlabs`
+- Base API URL: `https://api.inceptionlabs.ai/v1`
+- Endpoints: `POST /v1/chat/completions`, `GET /v1/models`
+- Auth env var: `INCEPTION_API_KEY`
+- Pas de fallback via `ZEROCLAW_API_KEY` / `API_KEY`
+- Modèle par défaut: `mercury-2`
+
+Validation rapide:
+
+```bash
+export INCEPTION_API_KEY="your-inception-api-key"
+zeroclaw models refresh --provider inception
+zeroclaw agent --provider inception --model mercury-2 -m "ping"
 ```

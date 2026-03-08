@@ -26,7 +26,14 @@ use std::io::{self, IsTerminal};
 use std::path::PathBuf;
 use std::time::Duration;
 
-const PROVIDER_OPTIONS: [&str; 5] = ["openrouter", "openai", "anthropic", "gemini", "ollama"];
+const PROVIDER_OPTIONS: [&str; 6] = [
+    "openrouter",
+    "openai",
+    "inception",
+    "anthropic",
+    "gemini",
+    "ollama",
+];
 const MEMORY_OPTIONS: [&str; 4] = ["sqlite", "lucid", "markdown", "none"];
 const TUNNEL_OPTIONS: [&str; 3] = ["none", "cloudflare", "ngrok"];
 
@@ -1549,6 +1556,28 @@ fn run_provider_probe(plan: &TuiOnboardPlan) -> CheckStatus {
             };
             match client
                 .get("https://api.openai.com/v1/models")
+                .header("Authorization", format!("Bearer {api_key}"))
+                .send()
+            {
+                Ok(response) if response.status().is_success() => {
+                    CheckStatus::Passed("models endpoint reachable".to_string())
+                }
+                Ok(response) => CheckStatus::Failed(format!("HTTP {}", response.status())),
+                Err(error) => CheckStatus::Failed(error.to_string()),
+            }
+        }
+        "inception" => {
+            if api_key.is_empty() {
+                return CheckStatus::Skipped(
+                    "missing API key (required for Inception probe)".to_string(),
+                );
+            }
+            let client = match probe_http_client() {
+                Ok(client) => client,
+                Err(error) => return CheckStatus::Failed(error.to_string()),
+            };
+            match client
+                .get("https://api.inceptionlabs.ai/v1/models")
                 .header("Authorization", format!("Bearer {api_key}"))
                 .send()
             {

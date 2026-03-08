@@ -20,6 +20,7 @@
 ## 更新记录
 
 - 2026-03-01：新增 StepFun provider 对齐信息（`stepfun` / `step` / `step-ai` / `step_ai`）。
+- 2026-03-08：新增 Inception Labs provider（`inception`，alias：`inceptionlabs`）。
 
 ## StepFun 快速说明
 
@@ -37,4 +38,23 @@
 export STEP_API_KEY="your-stepfun-api-key"
 zeroclaw models refresh --provider stepfun
 zeroclaw agent --provider stepfun --model step-3.5-flash -m "ping"
+```
+
+## Inception Labs 快速说明
+
+- Provider ID：`inception`
+- 别名：`inceptionlabs`
+- Base API URL：`https://api.inceptionlabs.ai/v1`
+- 对话端点：`POST /v1/chat/completions`
+- 模型列表端点：`GET /v1/models`
+- 鉴权变量：`INCEPTION_API_KEY`
+- 不回退到 `ZEROCLAW_API_KEY` / `API_KEY`
+- 默认模型：`mercury-2`
+
+快速验证：
+
+```bash
+export INCEPTION_API_KEY="your-inception-api-key"
+zeroclaw models refresh --provider inception
+zeroclaw agent --provider inception --model mercury-2 -m "ping"
 ```

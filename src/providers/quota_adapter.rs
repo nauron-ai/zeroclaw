@@ -256,6 +256,7 @@ impl UniversalQuotaExtractor {
         // Register provider-specific extractors
         extractors.insert("openai".to_string(), Box::new(OpenAIQuotaExtractor));
         extractors.insert("openai-codex".to_string(), Box::new(OpenAIQuotaExtractor));
+        extractors.insert("inception".to_string(), Box::new(OpenAIQuotaExtractor));
         extractors.insert("anthropic".to_string(), Box::new(AnthropicQuotaExtractor));
         extractors.insert("gemini".to_string(), Box::new(GeminiQuotaExtractor));
         extractors.insert("openrouter".to_string(), Box::new(OpenAIQuotaExtractor)); // OpenRouter uses OpenAI format

@@ -36,6 +36,7 @@ fn canonical_provider_for_model_defaults(provider_name: &str) -> String {
         "google" | "google-gemini" => "gemini".to_string(),
         "github-copilot" => "copilot".to_string(),
         "openai_codex" | "codex" => "openai-codex".to_string(),
+        "inceptionlabs" => "inception".to_string(),
         "kimi_coding" | "kimi_for_coding" => "kimi-code".to_string(),
         "nvidia-nim" | "build.nvidia.com" => "nvidia".to_string(),
         "aws-bedrock" => "bedrock".to_string(),
@@ -68,6 +69,7 @@ pub fn default_model_fallback_for_provider(provider_name: Option<&str>) -> &'sta
         "anthropic" => "claude-sonnet-4-5-20250929",
         "openai" => "gpt-5.2",
         "openai-codex" => "gpt-5-codex",
+        "inception" => "mercury-2",
         "venice" => "zai-org-glm-5",
         "groq" => "llama-3.3-70b-versatile",
         "mistral" => "mistral-large-latest",
@@ -12827,6 +12829,9 @@ provider_api = "not-a-real-mode"
         let openai = resolve_default_model_id(None, Some("openai"));
         assert_eq!(openai, "gpt-5.2");
 
+        let inception = resolve_default_model_id(None, Some("inception"));
+        assert_eq!(inception, "mercury-2");
+
         let stepfun = resolve_default_model_id(None, Some("stepfun"));
         assert_eq!(stepfun, "step-3.5-flash");
 
@@ -12847,6 +12852,9 @@ provider_api = "not-a-real-mode"
 
         let google_alias = resolve_default_model_id(None, Some("google-gemini"));
         assert_eq!(google_alias, "gemini-2.5-pro");
+
+        let inception_alias = resolve_default_model_id(None, Some("inceptionlabs"));
+        assert_eq!(inception_alias, "mercury-2");
 
         let step_alias = resolve_default_model_id(None, Some("step"));
         assert_eq!(step_alias, "step-3.5-flash");

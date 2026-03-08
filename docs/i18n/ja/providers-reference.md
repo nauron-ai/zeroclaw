@@ -20,6 +20,7 @@
 ## 更新ノート
 
 - 2026-03-01: StepFun provider 対応を追加（`stepfun`、alias: `step` / `step-ai` / `step_ai`）。
+- 2026-03-08: Inception Labs provider 対応を追加（`inception`、alias: `inceptionlabs`）。
 
 ## StepFun クイックガイド
 
@@ -36,4 +37,22 @@
 export STEP_API_KEY="your-stepfun-api-key"
 zeroclaw models refresh --provider stepfun
 zeroclaw agent --provider stepfun --model step-3.5-flash -m "ping"
+```
+
+## Inception Labs クイックガイド
+
+- Provider ID: `inception`
+- Aliases: `inceptionlabs`
+- Base API URL: `https://api.inceptionlabs.ai/v1`
+- Endpoints: `POST /v1/chat/completions`, `GET /v1/models`
+- 認証 env var: `INCEPTION_API_KEY`
+- `ZEROCLAW_API_KEY` / `API_KEY` fallback は無効
+- 既定モデル: `mercury-2`
+
+クイック検証:
+
+```bash
+export INCEPTION_API_KEY="your-inception-api-key"
+zeroclaw models refresh --provider inception
+zeroclaw agent --provider inception --model mercury-2 -m "ping"
 ```

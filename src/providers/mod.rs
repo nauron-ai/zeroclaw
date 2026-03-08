@@ -24,6 +24,7 @@ pub mod copilot;
 pub mod cursor;
 pub mod gemini;
 pub mod health;
+pub mod inception;
 pub mod ollama;
 pub mod openai;
 pub mod openrouter;
@@ -217,6 +218,10 @@ pub(crate) fn is_siliconflow_alias(name: &str) -> bool {
 
 pub(crate) fn is_stepfun_alias(name: &str) -> bool {
     matches!(name, "stepfun" | "step" | "step-ai" | "step_ai")
+}
+
+pub(crate) fn is_inception_alias(name: &str) -> bool {
+    matches!(name, "inception" | "inceptionlabs")
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -959,6 +964,7 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
         "openai" => vec!["OPENAI_API_KEY"],
         "ollama" => vec!["OLLAMA_API_KEY"],
         "venice" => vec!["VENICE_API_KEY"],
+        name if is_inception_alias(name) => vec!["INCEPTION_API_KEY"],
         "groq" => vec!["GROQ_API_KEY"],
         "mistral" => vec!["MISTRAL_API_KEY"],
         "deepseek" => vec!["DEEPSEEK_API_KEY"],
@@ -1019,6 +1025,10 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
     }
 
     if minimax_oauth_placeholder_requested && is_minimax_alias(name) {
+        return None;
+    }
+
+    if is_inception_alias(name) {
         return None;
     }
 
@@ -1250,6 +1260,17 @@ fn create_provider_with_url_and_options(
             key,
             AuthStyle::Bearer,
         ))),
+        name if is_inception_alias(name) => {
+            let base_url = api_url
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or(inception::INCEPTION_BASE_URL);
+            Ok(Box::new(inception::InceptionProvider::with_base_url(
+                base_url,
+                key,
+                options.max_tokens_override,
+            )))
+        }
         "vercel" | "vercel-ai" => Ok(Box::new(OpenAiCompatibleProvider::new(
             "Vercel AI Gateway",
             VERCEL_AI_GATEWAY_BASE_URL,
@@ -1942,6 +1963,12 @@ pub fn list_providers() -> Vec<ProviderInfo> {
             local: false,
         },
         ProviderInfo {
+            name: "inception",
+            display_name: "Inception Labs",
+            aliases: &["inceptionlabs"],
+            local: false,
+        },
+        ProviderInfo {
             name: "vercel",
             display_name: "Vercel AI Gateway",
             aliases: &["vercel-ai"],
@@ -2308,6 +2335,27 @@ mod tests {
     }
 
     #[test]
+    fn resolve_provider_credential_uses_inception_env_key() {
+        let _env_lock = env_lock();
+        let _provider_guard = EnvGuard::set("INCEPTION_API_KEY", Some("mercury-key"));
+        let _generic_guard = EnvGuard::set("API_KEY", Some("generic-key"));
+
+        let resolved = resolve_provider_credential("inception", None);
+        assert_eq!(resolved.as_deref(), Some("mercury-key"));
+    }
+
+    #[test]
+    fn resolve_provider_credential_inception_ignores_generic_fallback() {
+        let _env_lock = env_lock();
+        let _provider_guard = EnvGuard::set("INCEPTION_API_KEY", None);
+        let _generic_guard = EnvGuard::set("API_KEY", Some("generic-key"));
+        let _zeroclaw_guard = EnvGuard::set("ZEROCLAW_API_KEY", Some("zeroclaw-generic-key"));
+
+        let resolved = resolve_provider_credential("inceptionlabs", None);
+        assert!(resolved.is_none());
+    }
+
+    #[test]
     fn resolve_qwen_oauth_context_prefers_explicit_override() {
         let _env_lock = env_lock();
         let fake_home = format!("/tmp/zeroclaw-qwen-oauth-home-{}", std::process::id());
@@ -2602,6 +2650,20 @@ mod tests {
     #[test]
     fn factory_venice() {
         assert!(create_provider("venice", Some("vn-key")).is_ok());
+    }
+
+    #[test]
+    fn factory_inception() {
+        assert!(create_provider("inception", Some("key")).is_ok());
+        assert!(create_provider("inceptionlabs", Some("key")).is_ok());
+    }
+
+    #[test]
+    fn inception_provider_keeps_vision_disabled() {
+        let provider =
+            create_provider("inception", Some("key")).expect("inception provider should build");
+        assert!(provider.supports_native_tools());
+        assert!(!provider.supports_vision());
     }
 
     #[test]
@@ -3297,6 +3359,7 @@ providers = ["demo-plugin-provider"]
             "ollama",
             "gemini",
             "venice",
+            "inception",
             "vercel",
             "cloudflare",
             "moonshot",
@@ -3386,6 +3449,15 @@ providers = ["demo-plugin-provider"]
                 assert!(aliases.insert(alias), "Duplicate provider alias: {}", alias);
             }
         }
+    }
+
+    #[test]
+    fn listed_providers_include_inception_alias() {
+        let inception = list_providers()
+            .into_iter()
+            .find(|provider| provider.name == "inception")
+            .expect("inception provider should be listed");
+        assert_eq!(inception.aliases, &["inceptionlabs"]);
     }
 
     #[test]

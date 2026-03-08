@@ -298,7 +298,7 @@ Examples:
         #[arg(short, long)]
         message: Option<String>,
 
-        /// Provider to use (openrouter, anthropic, openai, openai-codex)
+        /// Provider to use (openrouter, anthropic, openai, openai-codex, inception)
         #[arg(short, long)]
         provider: Option<String>,
 

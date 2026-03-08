@@ -2,7 +2,7 @@
 
 Αυτό το έγγραφο περιγράφει τα ID των παρόχων, τα ψευδώνυμα (aliases) και τις μεταβλητές περιβάλλοντος για τη διαχείριση των διαπιστευτηρίων.
 
-Τελευταία επαλήθευση: **21 Φεβρουαρίου 2026**.
+Τελευταία επαλήθευση: **8 Μαρτίου 2026**.
 
 ## Προβολή Διαθέσιμων Παρόχων
 
@@ -19,6 +19,10 @@ zeroclaw providers
 2. **Μεταβλητές περιβάλλοντος παρόχου**: Μεταβλητές ειδικές για κάθε πάροχο (π.χ. `OPENAI_API_KEY`).
 3. **Γενικές μεταβλητές**: Εφεδρικές μεταβλητές όπως οι `ZEROCLAW_API_KEY` ή `API_KEY`.
 
+Εξαίρεση: ο `inception` δεν χρησιμοποιεί σκόπιμα fallback μέσω
+`ZEROCLAW_API_KEY` ή `API_KEY`. Χρησιμοποιήστε ρητό credential ή
+`INCEPTION_API_KEY`.
+
 > [!NOTE]
 > Σε περίπτωση χρήσης εφεδρικών παρόχων (`reliability.fallback_providers`), η επίλυση διαπιστευτηρίων γίνεται ανεξάρτητα για κάθε πάροχο. Τα κλειδιά του κύριου παρόχου δεν μεταφέρονται αυτόματα στους εφεδρικούς.
 
@@ -29,6 +33,7 @@ zeroclaw providers
 | `openrouter` | — | Όχι | `OPENROUTER_API_KEY` |
 | `anthropic` | — | Όχι | `ANTHROPIC_API_KEY`, `ANTHROPIC_OAUTH_TOKEN` |
 | `openai` | — | Όχι | `OPENAI_API_KEY` |
+| `inception` | `inceptionlabs` | Όχι | `INCEPTION_API_KEY` |
 | `ollama` | — | Ναι | `OLLAMA_API_KEY` (προαιρετικό) |
 | `gemini` | `google`, `google-gemini` | Όχι | `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
 | `bedrock` | `aws-bedrock` | Όχι | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` |
@@ -44,6 +49,15 @@ zeroclaw providers
 | `lmstudio` | `lm-studio` | Ναι | - |
 
 ## Ειδικές Σημειώσεις
+
+### Inception Labs
+
+- Provider ID: `inception` (alias: `inceptionlabs`)
+- Base API URL: `https://api.inceptionlabs.ai/v1`
+- Endpoints: `POST /v1/chat/completions`, `GET /v1/models`
+- Μεταβλητή αυθεντικοποίησης: `INCEPTION_API_KEY`
+- Δεν χρησιμοποιεί fallback `ZEROCLAW_API_KEY` / `API_KEY`
+- Προεπιλεγμένο μοντέλο: `mercury-2`
 
 ### Gemini (Google)
 
