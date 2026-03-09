@@ -2684,8 +2684,9 @@ mod tests {
         write_shell_completion(CompletionShell::Bash, &mut output)
             .expect("completion generation should succeed");
         let script = String::from_utf8(output).expect("completion output should be valid utf-8");
+        let expected_binary_name = Cli::command().get_name().to_string();
         assert!(
-            script.contains("zeroclaw"),
+            script.contains(&expected_binary_name),
             "completion script should reference binary name"
         );
     }

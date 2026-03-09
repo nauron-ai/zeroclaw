@@ -267,7 +267,7 @@ jobs:
                   BINARY_SIZE_HARD_LIMIT_MB: 32
                   BINARY_SIZE_ADVISORY_MB: 20
                   BINARY_SIZE_TARGET_MB: 5
-              run: bash scripts/ci/check_binary_size.sh target/release-fast/zeroclaw
+              run: bash scripts/ci/check_binary_size.sh target/release-fast/labaclaw
 
     docs-only:
         name: Docs-Only Fast Path
