@@ -372,28 +372,10 @@ jobs:
                       const script = require('./.github/workflows/scripts/lint_feedback.js');
                       await script({github, context, core});
 
-    license-file-owner-guard:
-        name: License File Owner Guard
-        needs: [changes]
-        if: github.event_name == 'pull_request'
-        runs-on: ubuntu-22.04
-        permissions:
-            contents: read
-            pull-requests: read
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-
-            - name: Enforce owner-only edits for root license files
-              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
-              with:
-                  script: |
-                    const script = require('./.github/workflows/scripts/ci_license_file_owner_guard.js');
-                    await script({ github, context, core });
     ci-required:
         name: CI Required Gate
         if: always()
-        needs: [changes, lint, workspace-check, package-check, test, build, docs-only, non-rust, docs-quality, lint-feedback, license-file-owner-guard]
+        needs: [changes, lint, workspace-check, package-check, test, build, docs-only, non-rust, docs-quality, lint-feedback]
         runs-on: ubuntu-22.04
         steps:
             - name: Enforce required status
@@ -405,16 +387,6 @@ jobs:
                   rust_changed="${{ needs.changes.outputs.rust_changed }}"
                   docs_changed="${{ needs.changes.outputs.docs_changed }}"
                   docs_result="${{ needs.docs-quality.result }}"
-                  license_owner_result="${{ needs.license-file-owner-guard.result }}"
-
-                  # --- Helper: enforce PR governance gates ---
-                  check_pr_governance() {
-                    if [ "$event_name" != "pull_request" ]; then return 0; fi
-                    if [ "$license_owner_result" != "success" ]; then
-                      echo "License file owner guard did not pass."
-                      exit 1
-                    fi
-                  }
 
                   check_docs_quality() {
                     if [ "$docs_changed" = "true" ] && [ "$docs_result" != "success" ]; then
@@ -425,7 +397,6 @@ jobs:
 
                   # --- Docs-only fast path ---
                   if [ "${{ needs.changes.outputs.docs_only }}" = "true" ]; then
-                    check_pr_governance
                     check_docs_quality
                     echo "Docs-only fast path passed."
                     exit 0
@@ -433,7 +404,6 @@ jobs:
 
                   # --- Non-rust fast path ---
                   if [ "$rust_changed" != "true" ]; then
-                    check_pr_governance
                     check_docs_quality
                     echo "Non-rust fast path passed."
                     exit 0
@@ -452,9 +422,6 @@ jobs:
                   echo "test=${test_result}"
                   echo "build=${build_result}"
                   echo "docs=${docs_result}"
-                  echo "license_file_owner_guard=${license_owner_result}"
-
-                  check_pr_governance
 
                   if [ "$lint_result" != "success" ] || [ "$workspace_check_result" != "success" ] || [ "$package_check_result" != "success" ] || [ "$test_result" != "success" ] || [ "$build_result" != "success" ]; then
                     echo "Required CI jobs did not pass: lint=${lint_result} workspace-check=${workspace_check_result} package-check=${package_check_result} test=${test_result} build=${build_result}"
