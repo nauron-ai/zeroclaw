@@ -10,8 +10,7 @@ use std::process::Command;
 
 /// GitHub repository for releases
 const GITHUB_REPO: &str = "nauron-ai/labaclaw";
-const GITHUB_API_RELEASES: &str =
-    "https://api.github.com/repos/nauron-ai/labaclaw/releases/latest";
+const GITHUB_API_RELEASES: &str = "https://api.github.com/repos/nauron-ai/labaclaw/releases/latest";
 
 /// Release information from GitHub API
 #[derive(Debug, serde::Deserialize)]
