@@ -51,19 +51,18 @@ reviews:
     - "!**/.cargo/**"
     - "!**/Cargo.lock"
 
-  # Review instructions specific to Rust and this project
+  # General review instructions
   path_instructions:
     - path: "**/*.rs"
       instructions: |
-        Focus on Rust best practices and idiomatic code.
-        Check for security vulnerabilities in encryption/crypto code.
-        Ensure proper error handling with Result types.
-        Verify memory safety and avoid unnecessary clones.
-        Check for proper use of lifetimes and borrowing.
-        Ensure tests cover critical security paths.
-    - path: "**/*.{toml,yml,yaml,json}"
-      instructions: |
-        Review configuration migration code carefully.
+        Prioritize separation of concerns and clear domain boundaries.
+        Prefer encapsulation and cohesive modules over ad-hoc helpers.
+        Flag primitive obsession: raw strings, tuples, booleans, or loosely shaped maps should not carry domain meaning when a named type or enum would make the design clearer.
+        Prefer conversions and normalization to live at boundaries instead of being scattered through callers.
+        Keep module roots thin and avoid growing large legacy files; prefer extracting focused submodules.
+        New files should stay roughly under 250 LOC unless there is a strong reason not to.
+        Flag wrappers that add no semantic value.
+        Prefer explicit, typed APIs and clear boundaries between domain, transport, storage, and configuration layers.
   
   # Enable finishing touches
   finishing_touches:
