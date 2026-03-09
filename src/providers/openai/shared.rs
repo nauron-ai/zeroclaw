@@ -55,18 +55,18 @@ impl ToolResultPayload {
 #[derive(Debug, Error)]
 pub(in crate::providers::openai) enum OpenAiPayloadParseError {
     #[error("invalid JSON in {context}: {source}")]
-    InvalidJson {
+    Json {
         context: &'static str,
         #[source]
         source: serde_json::Error,
     },
     #[error("invalid shape for {context}: {details}")]
-    InvalidShape {
+    Shape {
         context: &'static str,
         details: String,
     },
     #[error("invalid field type for {field} in {context}; expected {expected}")]
-    InvalidFieldType {
+    FieldType {
         context: &'static str,
         field: &'static str,
         expected: &'static str,
@@ -88,7 +88,7 @@ pub(in crate::providers::openai) fn parse_assistant_tool_calls_payload(
             .cloned()
             .expect("candidate key must exist"),
     )
-    .map_err(|source| OpenAiPayloadParseError::InvalidShape {
+    .map_err(|source| OpenAiPayloadParseError::Shape {
         context: ASSISTANT_PAYLOAD_CONTEXT,
         details: format!("tool_calls: {source}"),
     })?;
@@ -140,9 +140,9 @@ fn parse_candidate_object(
     }
 
     let parsed = serde_json::from_str::<Value>(trimmed)
-        .map_err(|source| OpenAiPayloadParseError::InvalidJson { context, source })?;
+        .map_err(|source| OpenAiPayloadParseError::Json { context, source })?;
     let Value::Object(map) = parsed else {
-        return Err(OpenAiPayloadParseError::InvalidShape {
+        return Err(OpenAiPayloadParseError::Shape {
             context,
             details: "expected top-level object".to_string(),
         });
@@ -163,7 +163,7 @@ fn optional_string_field(
     match map.get(field) {
         Some(Value::Null) | None => Ok(None),
         Some(Value::String(text)) => Ok(Some(text.clone())),
-        Some(_) => Err(OpenAiPayloadParseError::InvalidFieldType {
+        Some(_) => Err(OpenAiPayloadParseError::FieldType {
             context,
             field,
             expected: "string",
@@ -178,10 +178,10 @@ fn first_present_string_field(
 ) -> Result<Option<String>, OpenAiPayloadParseError> {
     for field in fields {
         match map.get(*field) {
-            Some(Value::Null) | None => continue,
+            Some(Value::Null) | None => {}
             Some(Value::String(text)) => return Ok(Some(text.clone())),
             Some(_) => {
-                return Err(OpenAiPayloadParseError::InvalidFieldType {
+                return Err(OpenAiPayloadParseError::FieldType {
                     context,
                     field,
                     expected: "string",

@@ -92,19 +92,18 @@ pub(super) fn resolve_responses_url(
     options: &ProviderRuntimeOptions,
     env: &CodexEnvConfig,
 ) -> anyhow::Result<String> {
-    for override_value in [
+    [
         env.responses_url.as_deref(),
         env.base_url.as_deref(),
         options.provider_api_url.as_deref(),
     ]
     .into_iter()
     .flatten()
-    .filter_map(|value| first_nonempty(Some(value)))
-    {
-        return build_responses_url(&override_value);
-    }
-
-    Ok(DEFAULT_CODEX_RESPONSES_URL.to_string())
+    .find_map(|value| first_nonempty(Some(value)))
+    .map_or_else(
+        || Ok(DEFAULT_CODEX_RESPONSES_URL.to_string()),
+        |override_value| build_responses_url(&override_value),
+    )
 }
 
 pub(super) fn canonical_endpoint(url: &str) -> Option<(String, String, u16, String)> {
@@ -152,13 +151,11 @@ pub(super) fn resolve_transport_mode(
         return Ok(mode);
     }
 
-    for value in [env.transport, env.provider_transport] {
-        if let Some(mode) = value {
-            return Ok(mode);
-        }
-    }
-
-    Ok(CodexTransport::Auto)
+    Ok([env.transport, env.provider_transport]
+        .into_iter()
+        .flatten()
+        .next()
+        .unwrap_or(CodexTransport::Auto))
 }
 
 pub(super) fn resolve_instructions(system_prompt: Option<&str>) -> String {

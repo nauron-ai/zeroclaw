@@ -89,15 +89,21 @@ impl WhatsAppIdentity {
 
     pub(in crate::channels::whatsapp::identity) fn merge(&self, newer: &Self) -> Self {
         Self {
-            lid: merge_field(&self.lid, &newer.lid),
-            phone_number: merge_field(&self.phone_number, &newer.phone_number),
-            full_name: merge_field(&self.full_name, &newer.full_name),
-            first_name: merge_field(&self.first_name, &newer.first_name),
-            push_name: merge_field(&self.push_name, &newer.push_name),
-            username: merge_field(&self.username, &newer.username),
-            about: merge_field(&self.about, &newer.about),
-            verified_name: merge_field(&self.verified_name, &newer.verified_name),
-            last_seen_jid: merge_field(&self.last_seen_jid, &newer.last_seen_jid),
+            lid: merge_field(self.lid.as_deref(), newer.lid.as_deref()),
+            phone_number: merge_field(self.phone_number.as_deref(), newer.phone_number.as_deref()),
+            full_name: merge_field(self.full_name.as_deref(), newer.full_name.as_deref()),
+            first_name: merge_field(self.first_name.as_deref(), newer.first_name.as_deref()),
+            push_name: merge_field(self.push_name.as_deref(), newer.push_name.as_deref()),
+            username: merge_field(self.username.as_deref(), newer.username.as_deref()),
+            about: merge_field(self.about.as_deref(), newer.about.as_deref()),
+            verified_name: merge_field(
+                self.verified_name.as_deref(),
+                newer.verified_name.as_deref(),
+            ),
+            last_seen_jid: merge_field(
+                self.last_seen_jid.as_deref(),
+                newer.last_seen_jid.as_deref(),
+            ),
             updated_at: self.updated_at.max(newer.updated_at),
         }
     }
@@ -133,8 +139,8 @@ impl WhatsAppIdentity {
     }
 }
 
-fn merge_field(current: &Option<String>, newer: &Option<String>) -> Option<String> {
-    newer.clone().or_else(|| current.clone())
+fn merge_field(current: Option<&str>, newer: Option<&str>) -> Option<String> {
+    newer.or(current).map(ToOwned::to_owned)
 }
 
 impl From<&str> for WhatsAppIdentity {
