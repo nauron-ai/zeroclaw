@@ -212,7 +212,7 @@ const response = await fetch(`https://${host}/v1/chat/completions`, {
     "Content-Type": "application/json",
   },
   body: JSON.stringify({
-    model: "anthropic/claude-sonnet-4-6",
+    model: "anthropic/claude-sonnet-4.6",
     messages: conversationHistory,
   }),
 });

@@ -106,12 +106,12 @@ If you need a **public URL** (e.g. WhatsApp webhook, external clients):
    labaclaw daemon --host 127.0.0.1 --port 42617
    ```
 
-2. Start a tunnel:
+2. Configure a tunnel provider:
    ```toml
    [tunnel]
    provider = "tailscale"   # or "ngrok", "cloudflare"
    ```
-   Or use `labaclaw tunnel` (see tunnel docs).
+   Then start the corresponding provider outside the CLI as required by that tunnel backend.
 
 3. LabaClaw will refuse `0.0.0.0` unless `allow_public_bind = true` or a tunnel is active.
 
@@ -228,15 +228,12 @@ Manual config copy is usually not required.
 
 `sudo labaclaw service install` automatically prepares `/etc/labaclaw`, migrates existing runtime state from your user setup when available, and sets ownership/permissions for the `labaclaw` service user.
 
-If no prior runtime state is available to migrate, create `/etc/labaclaw/config.toml` before starting the service.
+If no prior runtime state is available to migrate, first start will create `/etc/labaclaw/config.toml` with defaults. Pre-create or edit it before startup if you need non-default values on first boot.
 
 ### 7.4 Enable and Start
 
 ```bash
-# Add to default runlevel
-sudo rc-update add labaclaw default
-
-# Start the service
+# Install already adds the service to the default runlevel
 sudo rc-service labaclaw start
 
 # Check status
@@ -283,14 +280,13 @@ sudo labaclaw service uninstall
 
 - OpenRC is **system-wide only** (no user-level services)
 - Requires `sudo` or root for all service operations
-- The service runs as the `labaclaw:labaclaw` user (least privilege)
+- The service runs as the `labaclaw:labaclaw` user (least privilege, auto-created when missing)
 - Config must be at `/etc/labaclaw/config.toml` (explicit path in init script)
-- If the `labaclaw` user does not exist, install will fail with instructions to create it
+- `service install` already adds the service to the default OpenRC runlevel
 
 ### 7.9 Checklist: Alpine/OpenRC Deployment
 
 - [ ] Install: `sudo labaclaw service install`
-- [ ] Enable: `sudo rc-update add labaclaw default`
 - [ ] Start: `sudo rc-service labaclaw start`
 - [ ] Verify: `sudo rc-service labaclaw status`
 - [ ] Check logs: `/var/log/labaclaw/error.log`

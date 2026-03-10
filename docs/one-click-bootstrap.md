@@ -14,9 +14,9 @@ cd labaclaw
 
 What it does by default:
 
-1. `cargo build --release --locked`
-2. `cargo install --path . --force --locked`
-3. In interactive no-flag sessions, launches TUI onboarding (`labaclaw onboard --interactive-ui`)
+1. On Linux, interactive no-flag runs enter the guided installer before build/install.
+2. The guided flow can install system dependencies and Rust, choose build vs prebuilt, choose whether to install, and optionally run onboarding.
+3. Outside guided mode, bootstrap uses the standard local build/install flow and can launch interactive onboarding when selected.
 
 ### Resource preflight and pre-built flow
 
@@ -45,7 +45,7 @@ To bypass pre-built flow and force source compilation:
 
 ## Dual-mode bootstrap
 
-Default behavior builds/install LabaClaw and, for interactive no-flag runs, starts TUI onboarding.
+On Linux, no-flag interactive runs prefer the guided installer. Outside that path, bootstrap uses the standard build/install flow and interactive onboarding when selected.
 It still expects an existing Rust toolchain unless you enable bootstrap flags below.
 
 For fresh machines, enable environment bootstrap explicitly:
@@ -76,7 +76,7 @@ curl -fsSL https://raw.githubusercontent.com/nauron-ai/labaclaw/main/install.sh 
 
 For high-security environments, prefer Option A so you can review the script before execution.
 
-No-arg interactive runs default to full-screen TUI onboarding.
+No-arg interactive runs on Linux default to the guided installer, which can continue into onboarding.
 
 Legacy compatibility:
 
@@ -84,7 +84,7 @@ Legacy compatibility:
 curl -fsSL https://raw.githubusercontent.com/nauron-ai/labaclaw/main/scripts/install.sh | bash
 ```
 
-This legacy endpoint prefers forwarding to `scripts/bootstrap.sh` and falls back to legacy source install if unavailable in that revision.
+This legacy endpoint prefers `labaclaw_install.sh`, then `scripts/bootstrap.sh`, and otherwise errors if neither entrypoint exists in that revision.
 
 If you run Option B outside a repository checkout, the bootstrap script automatically clones a temporary workspace, builds, installs, and then cleans it up.
 

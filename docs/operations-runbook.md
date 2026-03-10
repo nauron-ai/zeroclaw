@@ -54,19 +54,23 @@ labaclaw service status
 
 ## Health and State Signals
 
+Default paths below assume the default config root at `~/.labaclaw`. If you run with
+`--config-dir` or `LABACLAW_CONFIG_DIR`, replace `~/.labaclaw` with that directory.
+OpenRC services use `/etc/labaclaw` for config/state and `/var/log/labaclaw` for logs.
+
 | Signal | Command / File | Expected |
 |---|---|---|
 | Config validity | `labaclaw doctor` | no critical errors |
 | Channel connectivity | `labaclaw channel doctor` | configured channels healthy |
 | Runtime summary | `labaclaw status` | expected provider/model/channels |
-| Daemon heartbeat/state | `~/.labaclaw/daemon_state.json` | file updates periodically |
+| Daemon heartbeat/state | `daemon_state.json` in the resolved config dir (default: `~/.labaclaw/daemon_state.json`) | file updates periodically |
 
 ## Logs and Diagnostics
 
 ### macOS / Windows (service wrapper logs)
 
-- `~/.labaclaw/logs/daemon.stdout.log`
-- `~/.labaclaw/logs/daemon.stderr.log`
+- `logs/daemon.stdout.log` in the resolved config dir (default: `~/.labaclaw/logs/daemon.stdout.log`)
+- `logs/daemon.stderr.log` in the resolved config dir (default: `~/.labaclaw/logs/daemon.stderr.log`)
 
 ### Linux (systemd user service)
 
@@ -97,7 +101,8 @@ labaclaw service stop
 labaclaw service start
 ```
 
-4. If channels still fail, verify allowlists and credentials in `~/.labaclaw/config.toml`.
+4. If channels still fail, verify allowlists and credentials in the resolved `config.toml`
+   (default: `~/.labaclaw/config.toml`; OpenRC: `/etc/labaclaw/config.toml`).
 
 5. If gateway is involved, verify bind/auth settings (`[gateway]`) and local reachability.
 
@@ -125,7 +130,7 @@ When CI reports a gitleaks finding or uploads SARIF alerts:
 
 Before applying config changes:
 
-1. backup `~/.labaclaw/config.toml`
+1. backup the active `config.toml` (default: `~/.labaclaw/config.toml`; OpenRC: `/etc/labaclaw/config.toml`)
 2. apply one logical change at a time
 3. run `labaclaw doctor`
 4. restart daemon/service

@@ -6,9 +6,10 @@ Last verified: **February 28, 2026**.
 
 Config path resolution at startup:
 
-1. `LABACLAW_WORKSPACE` override (if set)
-2. persisted `~/.labaclaw/active_workspace.toml` marker (if present)
-3. default `~/.labaclaw/config.toml`
+1. `LABACLAW_CONFIG_DIR` override (if set, or via `--config-dir`)
+2. `LABACLAW_WORKSPACE` override (if set)
+3. persisted `~/.labaclaw/active_workspace.toml` marker (if present)
+4. default `~/.labaclaw/config.toml`
 
 LabaClaw logs the resolved config on startup at `INFO` level:
 
@@ -27,7 +28,7 @@ CLI commands for config inspection and modification:
 |---|---|---|
 | `default_provider` | `openrouter` | provider ID or alias |
 | `provider_api` | unset | Optional API mode for `custom:<url>` providers: `openai-chat-completions` or `openai-responses` |
-| `default_model` | `anthropic/claude-sonnet-4-6` | model routed through selected provider |
+| `default_model` | `anthropic/claude-sonnet-4.6` | model routed through selected provider |
 | `default_temperature` | `0.7` | model temperature |
 | `model_support_vision` | unset (`None`) | Vision support override for active provider/model |
 
@@ -535,7 +536,7 @@ Notes:
 ```toml
 [agents.researcher]
 provider = "openrouter"
-model = "anthropic/claude-sonnet-4-6"
+model = "anthropic/claude-sonnet-4.6"
 system_prompt = "You are a research assistant."
 max_depth = 2
 agentic = true

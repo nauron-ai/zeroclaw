@@ -42,7 +42,7 @@ Useful follow-up commands:
 ```bash
 labaclaw doctor
 labaclaw config show
-labaclaw channels list
+labaclaw channel list
 ```
 
 ## Start Reading
