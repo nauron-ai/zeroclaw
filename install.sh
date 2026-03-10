@@ -4,7 +4,7 @@ set -euo pipefail
 # Canonical remote installer entrypoint.
 # Default behavior for no-arg interactive shells is TUI onboarding.
 
-BOOTSTRAP_URL="${ZEROCLAW_BOOTSTRAP_URL:-https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/refs/heads/main/scripts/bootstrap.sh}"
+BOOTSTRAP_URL="${LABACLAW_BOOTSTRAP_URL:-${ZEROCLAW_BOOTSTRAP_URL:-https://raw.githubusercontent.com/nauron-ai/labaclaw/main/scripts/bootstrap.sh}}"
 
 have_cmd() {
   command -v "$1" >/dev/null 2>&1
@@ -36,7 +36,7 @@ run_remote_bootstrap() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd || pwd)"
-LOCAL_INSTALLER="$SCRIPT_DIR/zeroclaw_install.sh"
+LOCAL_INSTALLER="$SCRIPT_DIR/labaclaw_install.sh"
 
 declare -a FORWARDED_ARGS=("$@")
 # In piped one-liners (`curl ... | bash`) stdin is not a TTY; prefer the

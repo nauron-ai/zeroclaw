@@ -287,12 +287,12 @@ Launches an interactive chat session with the configured AI provider. \
 Use --message for single-shot queries without entering interactive mode.
 
 Examples:
-  zeroclaw agent                              # interactive session
-  zeroclaw agent -m \"Summarize today's logs\"  # single message
-  zeroclaw agent -p anthropic --model claude-sonnet-4-20250514
-  zeroclaw agent --peripheral nucleo-f401re:/dev/ttyACM0
-  zeroclaw agent --autonomy-level full --max-actions-per-hour 100
-  zeroclaw agent -m \"quick task\" --memory-backend none --compact-context")]
+  labaclaw agent                              # interactive session
+  labaclaw agent -m \"Summarize today's logs\"  # single message
+  labaclaw agent -p anthropic --model claude-sonnet-4-20250514
+  labaclaw agent --peripheral nucleo-f401re:/dev/ttyACM0
+  labaclaw agent --autonomy-level full --max-actions-per-hour 100
+  labaclaw agent -m \"quick task\" --memory-backend none --compact-context")]
     Agent {
         /// Single message mode (don't enter interactive mode)
         #[arg(short, long)]
@@ -348,12 +348,12 @@ and WebSocket connections. Bind address defaults to the values in \
 your config file (gateway.host / gateway.port).
 
 Examples:
-  zeroclaw gateway                  # use config defaults
-  zeroclaw gateway -p 8080          # listen on port 8080
-  zeroclaw gateway --host 0.0.0.0   # bind to all interfaces
-  zeroclaw gateway --open-dashboard # open web dashboard automatically
-  zeroclaw gateway -p 0             # random available port
-  zeroclaw gateway --new-pairing    # clear tokens and generate fresh pairing code")]
+  labaclaw gateway                  # use config defaults
+  labaclaw gateway -p 8080          # listen on port 8080
+  labaclaw gateway --host 0.0.0.0   # bind to all interfaces
+  labaclaw gateway --open-dashboard # open web dashboard automatically
+  labaclaw gateway -p 0             # random available port
+  labaclaw gateway --new-pairing    # clear tokens and generate fresh pairing code")]
     Gateway {
         /// Port to listen on (use 0 for random available port); defaults to config gateway.port
         #[arg(short, long)]
@@ -376,18 +376,18 @@ Examples:
     #[command(long_about = "\
 Start the long-running autonomous daemon.
 
-Launches the full ZeroClaw runtime: gateway server, all configured \
+Launches the full LabaClaw runtime: gateway server, all configured \
 channels (Telegram, Discord, Slack, etc.), heartbeat monitor, and \
-the cron scheduler. This is the recommended way to run ZeroClaw in \
+the cron scheduler. This is the recommended way to run LabaClaw in \
 production or as an always-on assistant.
 
-Use 'zeroclaw service install' to register the daemon as an OS \
+Use 'labaclaw service install' to register the daemon as an OS \
 service (systemd/launchd) for auto-start on boot.
 
 Examples:
-  zeroclaw daemon                   # use config defaults
-  zeroclaw daemon -p 9090           # gateway on port 9090
-  zeroclaw daemon --host 127.0.0.1  # localhost only")]
+  labaclaw daemon                   # use config defaults
+  labaclaw daemon -p 9090           # gateway on port 9090
+  labaclaw daemon --host 127.0.0.1  # localhost only")]
     Daemon {
         /// Port to listen on (use 0 for random available port); defaults to config gateway.port
         #[arg(short, long)]
@@ -417,19 +417,19 @@ Examples:
     /// Show system status (full details)
     Status,
 
-    /// Self-update ZeroClaw to the latest version
+    /// Self-update LabaClaw to the latest version
     #[command(long_about = "\
-Self-update ZeroClaw to the latest release from GitHub.
+Self-update LabaClaw to the latest release from GitHub.
 
 Downloads the appropriate pre-built binary for your platform and
 replaces the current executable. Requires write permissions to
 the binary location.
 
 Examples:
-  zeroclaw update              # Update to latest version
-  zeroclaw update --check      # Check for updates without installing
-  zeroclaw update --instructions # Show install-method-specific update instructions
-  zeroclaw update --force      # Reinstall even if already up to date")]
+  labaclaw update              # Update to latest version
+  labaclaw update --check      # Check for updates without installing
+  labaclaw update --instructions # Show install-method-specific update instructions
+  labaclaw update --force      # Reinstall even if already up to date")]
     Update {
         /// Check for updates without installing
         #[arg(long, conflicts_with_all = ["force", "instructions"])]
@@ -447,19 +447,19 @@ Examples:
     /// Engage, inspect, and resume emergency-stop states.
     ///
     /// Examples:
-    /// - `zeroclaw estop`
-    /// - `zeroclaw estop --level network-kill`
-    /// - `zeroclaw estop --level domain-block --domain "*.chase.com"`
-    /// - `zeroclaw estop --level tool-freeze --tool shell --tool browser`
-    /// - `zeroclaw estop status`
-    /// - `zeroclaw estop resume --network`
-    /// - `zeroclaw estop resume --domain "*.chase.com"`
-    /// - `zeroclaw estop resume --tool shell`
+    /// - `labaclaw estop`
+    /// - `labaclaw estop --level network-kill`
+    /// - `labaclaw estop --level domain-block --domain "*.chase.com"`
+    /// - `labaclaw estop --level tool-freeze --tool shell --tool browser`
+    /// - `labaclaw estop status`
+    /// - `labaclaw estop resume --network`
+    /// - `labaclaw estop resume --domain "*.chase.com"`
+    /// - `labaclaw estop resume --tool shell`
     Estop {
         #[command(subcommand)]
         estop_command: Option<EstopSubcommands>,
 
-        /// Level used when engaging estop from `zeroclaw estop`.
+        /// Level used when engaging estop from `labaclaw estop`.
         #[arg(long, value_enum)]
         level: Option<EstopLevelArg>,
 
@@ -479,10 +479,10 @@ Manage security maintenance tasks.
 Commands in this group maintain security-related data stores used at runtime.
 
 Examples:
-  zeroclaw security update-guard-corpus
-  zeroclaw security update-guard-corpus --source builtin
-  zeroclaw security update-guard-corpus --source ./data/security/attack-corpus-v1.jsonl
-  zeroclaw security update-guard-corpus --source https://example.com/guard-corpus.jsonl --checksum <sha256>")]
+  labaclaw security update-guard-corpus
+  labaclaw security update-guard-corpus --source builtin
+  labaclaw security update-guard-corpus --source ./data/security/attack-corpus-v1.jsonl
+  labaclaw security update-guard-corpus --source https://example.com/guard-corpus.jsonl --checksum <sha256>")]
     Security {
         #[command(subcommand)]
         security_command: SecurityCommands,
@@ -500,14 +500,14 @@ Cron expressions use the standard 5-field format: \
 override with --tz and an IANA timezone name.
 
 Examples:
-  zeroclaw cron list
-  zeroclaw cron add '0 9 * * 1-5' 'Good morning' --tz America/New_York
-  zeroclaw cron add '*/30 * * * *' 'Check system health'
-  zeroclaw cron add-at 2025-01-15T14:00:00Z 'Send reminder'
-  zeroclaw cron add-every 60000 'Ping heartbeat'
-  zeroclaw cron once 30m 'Run backup in 30 minutes'
-  zeroclaw cron pause <task-id>
-  zeroclaw cron update <task-id> --expression '0 8 * * *' --tz Europe/London")]
+  labaclaw cron list
+  labaclaw cron add '0 9 * * 1-5' 'Good morning' --tz America/New_York
+  labaclaw cron add '*/30 * * * *' 'Check system health'
+  labaclaw cron add-at 2025-01-15T14:00:00Z 'Send reminder'
+  labaclaw cron add-every 60000 'Ping heartbeat'
+  labaclaw cron once 30m 'Run backup in 30 minutes'
+  labaclaw cron pause <task-id>
+  labaclaw cron update <task-id> --expression '0 8 * * *' --tz Europe/London")]
     Cron {
         #[command(subcommand)]
         cron_command: CronCommands,
@@ -533,9 +533,9 @@ and per-profile breakdown for all configured providers. Helps diagnose \
 quota exhaustion and rate limiting issues.
 
 Examples:
-  zeroclaw providers-quota                    # text output, all providers
-  zeroclaw providers-quota --format json      # JSON output
-  zeroclaw providers-quota --provider gemini  # filter by provider"
+  labaclaw providers-quota                    # text output, all providers
+  labaclaw providers-quota --format json      # JSON output
+  labaclaw providers-quota --provider gemini  # filter by provider"
     )]
     ProvidersQuota {
         /// Filter by provider name (optional, shows all if omitted)
@@ -550,17 +550,17 @@ Examples:
     #[command(long_about = "\
 Manage communication channels.
 
-Add, remove, list, and health-check channels that connect ZeroClaw \
+Add, remove, list, and health-check channels that connect LabaClaw \
 to messaging platforms. Supported channel types: telegram, discord, \
 slack, mattermost, whatsapp, matrix, signal, qq, napcat, \
 lark, feishu, dingtalk, github, nextcloud, irc, imessage, email.
 
 Examples:
-  zeroclaw channel list
-  zeroclaw channel doctor
-  zeroclaw channel add telegram '{\"bot_token\":\"...\",\"name\":\"my-bot\"}'
-  zeroclaw channel remove my-bot
-  zeroclaw channel bind-telegram zeroclaw_user")]
+  labaclaw channel list
+  labaclaw channel doctor
+  labaclaw channel add telegram '{\"bot_token\":\"...\",\"name\":\"my-bot\"}'
+  labaclaw channel remove my-bot
+  labaclaw channel bind-telegram labaclaw_user")]
     Channel {
         #[command(subcommand)]
         channel_command: ChannelCommands,
@@ -600,9 +600,9 @@ Enumerate connected USB devices, identify known development boards \
 probe-rs / ST-Link.
 
 Examples:
-  zeroclaw hardware discover
-  zeroclaw hardware introspect /dev/ttyACM0
-  zeroclaw hardware info --chip STM32F401RETx")]
+  labaclaw hardware discover
+  labaclaw hardware introspect /dev/ttyACM0
+  labaclaw hardware info --chip STM32F401RETx")]
     Hardware {
         #[command(subcommand)]
         hardware_command: zeroclaw::HardwareCommands,
@@ -617,11 +617,11 @@ to the agent (GPIO, sensors, actuators). Supported boards: \
 nucleo-f401re, rpi-gpio, esp32, arduino-uno.
 
 Examples:
-  zeroclaw peripheral list
-  zeroclaw peripheral add nucleo-f401re /dev/ttyACM0
-  zeroclaw peripheral add rpi-gpio native
-  zeroclaw peripheral flash --port /dev/cu.usbmodem12345
-  zeroclaw peripheral flash-nucleo")]
+  labaclaw peripheral list
+  labaclaw peripheral add nucleo-f401re /dev/ttyACM0
+  labaclaw peripheral add rpi-gpio native
+  labaclaw peripheral flash --port /dev/cu.usbmodem12345
+  labaclaw peripheral flash-nucleo")]
     Peripheral {
         #[command(subcommand)]
         peripheral_command: zeroclaw::PeripheralCommands,
@@ -636,11 +636,11 @@ Supports filtering by category and session, pagination, and \
 batch clearing with confirmation.
 
 Examples:
-  zeroclaw memory stats
-  zeroclaw memory list
-  zeroclaw memory list --category core --limit 10
-  zeroclaw memory get <key>
-  zeroclaw memory clear --category conversation --yes")]
+  labaclaw memory stats
+  labaclaw memory list
+  labaclaw memory list --category core --limit 10
+  labaclaw memory get <key>
+  labaclaw memory clear --category conversation --yes")]
     Memory {
         #[command(subcommand)]
         memory_command: MemoryCommands,
@@ -648,15 +648,15 @@ Examples:
 
     /// Manage configuration
     #[command(long_about = "\
-Manage ZeroClaw configuration.
+Manage LabaClaw configuration.
 
 Inspect, query, and modify configuration settings.
 
 Examples:
-  zeroclaw config show                        # show effective config (secrets masked)
-  zeroclaw config get gateway.port            # query a specific value by dot-path
-  zeroclaw config set gateway.port 8080       # update a value and save to config.toml
-  zeroclaw config schema                      # print full JSON Schema to stdout")]
+  labaclaw config show                        # show effective config (secrets masked)
+  labaclaw config get gateway.port            # query a specific value by dot-path
+  labaclaw config set gateway.port 8080       # update a value and save to config.toml
+  labaclaw config schema                      # print full JSON Schema to stdout")]
     Config {
         #[command(subcommand)]
         config_command: ConfigCommands,
@@ -664,14 +664,14 @@ Examples:
 
     /// Generate shell completion script to stdout
     #[command(long_about = "\
-Generate shell completion scripts for `zeroclaw`.
+Generate shell completion scripts for `labaclaw`.
 
 The script is printed to stdout so it can be sourced directly:
 
 Examples:
-  source <(zeroclaw completions bash)
-  zeroclaw completions zsh > ~/.zfunc/_zeroclaw
-  zeroclaw completions fish > ~/.config/fish/completions/zeroclaw.fish")]
+  source <(labaclaw completions bash)
+  labaclaw completions zsh > ~/.zfunc/_labaclaw
+  labaclaw completions fish > ~/.config/fish/completions/labaclaw.fish")]
     Completions {
         /// Target shell
         #[arg(value_enum)]
@@ -1082,7 +1082,7 @@ async fn main() -> Result<()> {
         let (_validator, enrollment_uri) =
             security::OtpValidator::from_config(&config.security.otp, config_dir, &store)?;
         if let Some(uri) = enrollment_uri {
-            println!("Initialized OTP secret for ZeroClaw.");
+            println!("Initialized OTP secret for LabaClaw.");
             println!("Enrollment URI: {uri}");
         }
     }
@@ -1156,9 +1156,9 @@ async fn main() -> Result<()> {
             let port = port.unwrap_or(config.gateway.port);
             let host = host.unwrap_or_else(|| config.gateway.host.clone());
             if port == 0 {
-                info!("🚀 Starting ZeroClaw Gateway on {host} (random port)");
+                info!("🚀 Starting LabaClaw Gateway on {host} (random port)");
             } else {
-                info!("🚀 Starting ZeroClaw Gateway on {host}:{port}");
+                info!("🚀 Starting LabaClaw Gateway on {host}:{port}");
             }
             if open_dashboard {
                 if port == 0 {
@@ -1186,15 +1186,15 @@ async fn main() -> Result<()> {
             let port = port.unwrap_or(config.gateway.port);
             let host = host.unwrap_or_else(|| config.gateway.host.clone());
             if port == 0 {
-                info!("🧠 Starting ZeroClaw Daemon on {host} (random port)");
+                info!("🧠 Starting LabaClaw Daemon on {host} (random port)");
             } else {
-                info!("🧠 Starting ZeroClaw Daemon on {host}:{port}");
+                info!("🧠 Starting LabaClaw Daemon on {host}:{port}");
             }
             daemon::run(config, host, port).await
         }
 
         Commands::Status => {
-            println!("🦀 ZeroClaw Status");
+            println!("🦀 LabaClaw Status");
             println!();
             println!("Version:     {}", ZEROCLAW_BUILD_VERSION);
             println!("Workspace:   {}", config.workspace_dir.display());
@@ -1626,7 +1626,7 @@ fn handle_estop_command(
                 let (validator, enrollment_uri) =
                     security::OtpValidator::from_config(&config.security.otp, config_dir, &store)?;
                 if let Some(uri) = enrollment_uri {
-                    println!("Initialized OTP secret for ZeroClaw.");
+                    println!("Initialized OTP secret for LabaClaw.");
                     println!("Enrollment URI: {uri}");
                 }
                 Some(validator)
@@ -2059,7 +2059,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                         Err(e) => {
                             println!("Callback capture failed: {e}");
                             println!(
-                                "Run `zeroclaw auth paste-redirect --provider gemini --profile {profile}`"
+                                "Run `labaclaw auth paste-redirect --provider gemini --profile {profile}`"
                             );
                             return Ok(());
                         }
@@ -2155,7 +2155,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                         Err(e) => {
                             println!("Callback capture failed: {e}");
                             println!(
-                                "Run `zeroclaw auth paste-redirect --provider openai-codex --profile {profile}`"
+                                "Run `labaclaw auth paste-redirect --provider openai-codex --profile {profile}`"
                             );
                             return Ok(());
                         }
@@ -2197,7 +2197,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                                 anyhow::anyhow!(
                                     "No pending OpenAI login found.\n\n\
                                 💡 Please start the login flow first:\n   \
-                                zeroclaw auth login --provider openai-codex --profile {}\n\n\
+                                labaclaw auth login --provider openai-codex --profile {}\n\n\
                                 Then paste the callback URL or code here.",
                                     profile
                                 )
@@ -2257,7 +2257,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                             eprintln!("   The pending auth file has been cleared.");
                             eprintln!("   Please start fresh with:");
                             eprintln!(
-                                "   zeroclaw auth login --provider openai-codex --profile {}",
+                                "   labaclaw auth login --provider openai-codex --profile {}",
                                 profile
                             );
                             std::process::exit(1);
@@ -2272,7 +2272,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                                 anyhow::anyhow!(
                                     "No pending Gemini login found.\n\n\
                                 💡 Please start the login flow first:\n   \
-                                zeroclaw auth login --provider gemini --profile {}\n\n\
+                                labaclaw auth login --provider gemini --profile {}\n\n\
                                 Then paste the callback URL or code here.",
                                     profile
                                 )
@@ -2334,7 +2334,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                             eprintln!("   The pending auth file has been cleared.");
                             eprintln!("   Please start fresh with:");
                             eprintln!(
-                                "   zeroclaw auth login --provider gemini --profile {}",
+                                "   labaclaw auth login --provider gemini --profile {}",
                                 profile
                             );
                             std::process::exit(1);
@@ -2416,7 +2416,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                         }
                         None => {
                             bail!(
-                                "No OpenAI Codex auth profile found. Run `zeroclaw auth login --provider openai-codex`."
+                                "No OpenAI Codex auth profile found. Run `labaclaw auth login --provider openai-codex`."
                             )
                         }
                     }
@@ -2434,7 +2434,7 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
                         }
                         None => {
                             bail!(
-                                "No Gemini auth profile found. Run `zeroclaw auth login --provider gemini`."
+                                "No Gemini auth profile found. Run `labaclaw auth login --provider gemini`."
                             )
                         }
                     }
@@ -2545,7 +2545,7 @@ mod tests {
     #[test]
     fn onboard_cli_accepts_model_provider_and_api_key_in_quick_mode() {
         let cli = Cli::try_parse_from([
-            "zeroclaw",
+            "labaclaw",
             "onboard",
             "--provider",
             "openrouter",
@@ -2580,7 +2580,7 @@ mod tests {
     #[test]
     fn completions_cli_parses_supported_shells() {
         for shell in ["bash", "fish", "zsh", "powershell", "elvish"] {
-            let cli = Cli::try_parse_from(["zeroclaw", "completions", shell])
+            let cli = Cli::try_parse_from(["labaclaw", "completions", shell])
                 .expect("completions invocation should parse");
             match cli.command {
                 Commands::Completions { .. } => {}
@@ -2627,7 +2627,7 @@ mod tests {
 
     #[test]
     fn gateway_cli_accepts_new_pairing_flag() {
-        let cli = Cli::try_parse_from(["zeroclaw", "gateway", "--new-pairing"])
+        let cli = Cli::try_parse_from(["labaclaw", "gateway", "--new-pairing"])
             .expect("gateway --new-pairing should parse");
 
         match cli.command {
@@ -2638,7 +2638,7 @@ mod tests {
 
     #[test]
     fn gateway_cli_accepts_open_dashboard_flag() {
-        let cli = Cli::try_parse_from(["zeroclaw", "gateway", "--open-dashboard"])
+        let cli = Cli::try_parse_from(["labaclaw", "gateway", "--open-dashboard"])
             .expect("gateway --open-dashboard should parse");
 
         match cli.command {
@@ -2649,7 +2649,7 @@ mod tests {
 
     #[test]
     fn gateway_cli_defaults_flags_to_false() {
-        let cli = Cli::try_parse_from(["zeroclaw", "gateway"]).expect("gateway should parse");
+        let cli = Cli::try_parse_from(["labaclaw", "gateway"]).expect("gateway should parse");
 
         match cli.command {
             Commands::Gateway {
@@ -2693,7 +2693,7 @@ mod tests {
 
     #[test]
     fn onboard_cli_accepts_force_flag() {
-        let cli = Cli::try_parse_from(["zeroclaw", "onboard", "--force"])
+        let cli = Cli::try_parse_from(["labaclaw", "onboard", "--force"])
             .expect("onboard --force should parse");
 
         match cli.command {
@@ -2704,7 +2704,7 @@ mod tests {
 
     #[test]
     fn onboard_cli_accepts_interactive_ui_flag() {
-        let cli = Cli::try_parse_from(["zeroclaw", "onboard", "--interactive-ui"])
+        let cli = Cli::try_parse_from(["labaclaw", "onboard", "--interactive-ui"])
             .expect("onboard --interactive-ui should parse");
 
         match cli.command {
@@ -2722,7 +2722,7 @@ mod tests {
 
     #[test]
     fn onboard_cli_accepts_no_totp_flag() {
-        let cli = Cli::try_parse_from(["zeroclaw", "onboard", "--no-totp"])
+        let cli = Cli::try_parse_from(["labaclaw", "onboard", "--no-totp"])
             .expect("onboard --no-totp should parse");
 
         match cli.command {
@@ -2734,7 +2734,7 @@ mod tests {
     #[test]
     fn onboard_cli_accepts_openclaw_migration_flags() {
         let cli = Cli::try_parse_from([
-            "zeroclaw",
+            "labaclaw",
             "onboard",
             "--migrate-openclaw",
             "--openclaw-source",
@@ -2768,7 +2768,7 @@ mod tests {
     #[test]
     fn migrate_openclaw_cli_accepts_source_and_module_flags() {
         let cli = Cli::try_parse_from([
-            "zeroclaw",
+            "labaclaw",
             "migrate",
             "openclaw",
             "--source",
@@ -2809,7 +2809,7 @@ mod tests {
 
     #[test]
     fn cli_parses_estop_default_engage() {
-        let cli = Cli::try_parse_from(["zeroclaw", "estop"]).expect("estop command should parse");
+        let cli = Cli::try_parse_from(["labaclaw", "estop"]).expect("estop command should parse");
 
         match cli.command {
             Commands::Estop {
@@ -2829,7 +2829,7 @@ mod tests {
 
     #[test]
     fn cli_parses_estop_resume_domain() {
-        let cli = Cli::try_parse_from(["zeroclaw", "estop", "resume", "--domain", "*.chase.com"])
+        let cli = Cli::try_parse_from(["labaclaw", "estop", "resume", "--domain", "*.chase.com"])
             .expect("estop resume command should parse");
 
         match cli.command {
@@ -2855,15 +2855,15 @@ mod tests {
             .write_long_help(&mut output)
             .expect("help generation should succeed");
         let help = String::from_utf8(output).expect("help output should be utf-8");
-        assert!(help.contains("zeroclaw config show"));
-        assert!(help.contains("zeroclaw config get gateway.port"));
-        assert!(help.contains("zeroclaw config set gateway.port 8080"));
+        assert!(help.contains("labaclaw config show"));
+        assert!(help.contains("labaclaw config get gateway.port"));
+        assert!(help.contains("labaclaw config set gateway.port 8080"));
     }
 
     #[test]
     fn config_cli_parses_show_get_set_subcommands() {
         let show =
-            Cli::try_parse_from(["zeroclaw", "config", "show"]).expect("config show should parse");
+            Cli::try_parse_from(["labaclaw", "config", "show"]).expect("config show should parse");
         match show.command {
             Commands::Config {
                 config_command: ConfigCommands::Show,
@@ -2871,7 +2871,7 @@ mod tests {
             other => panic!("expected config show, got {other:?}"),
         }
 
-        let get = Cli::try_parse_from(["zeroclaw", "config", "get", "gateway.port"])
+        let get = Cli::try_parse_from(["labaclaw", "config", "get", "gateway.port"])
             .expect("config get should parse");
         match get.command {
             Commands::Config {
@@ -2880,7 +2880,7 @@ mod tests {
             other => panic!("expected config get, got {other:?}"),
         }
 
-        let set = Cli::try_parse_from(["zeroclaw", "config", "set", "gateway.port", "8080"])
+        let set = Cli::try_parse_from(["labaclaw", "config", "set", "gateway.port", "8080"])
             .expect("config set should parse");
         match set.command {
             Commands::Config {
@@ -2937,7 +2937,7 @@ mod tests {
 
     #[test]
     fn update_cli_parses_instructions_flag() {
-        let cli = Cli::try_parse_from(["zeroclaw", "update", "--instructions"])
+        let cli = Cli::try_parse_from(["labaclaw", "update", "--instructions"])
             .expect("update --instructions should parse");
 
         match cli.command {

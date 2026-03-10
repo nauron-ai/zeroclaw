@@ -4,8 +4,8 @@ Thanks for contributing to LabaClaw.
 This repository is a public fork of ZeroClaw and is being actively redirected toward a mesh-first, distributed runtime.
 
 > **Fork provenance and sync policy**
-> Contributor docs use the target LabaClaw surface now.
-> Some runtime and script internals still carry legacy `zeroclaw` identifiers and will be migrated in a follow-up code track.
+> Contributor docs should normalize around the target LabaClaw surface.
+> Some runtime and script internals still carry legacy `zeroclaw` identifiers and are being migrated in a follow-up code track.
 > Upstream material may be synced from ZeroClaw either 1:1 or adapted qualitatively when LabaClaw needs a different operator or architecture shape.
 
 ## First-Time Contributors
@@ -68,7 +68,7 @@ When in doubt, choose the higher track.
 ## Docs Rules
 
 - Keep docs English-only.
-- Use the target LabaClaw surface in user-facing docs.
+- Use the target LabaClaw surface in user-facing docs, and call out runtime gaps explicitly when they affect setup or operations.
 - Limit ZeroClaw references to provenance, migration-status, and sync-policy notes.
 - Update the nearest docs index and `docs/SUMMARY.md` when adding a major document.
 

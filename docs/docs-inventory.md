@@ -94,6 +94,7 @@ These are useful context, but not strict runtime contracts.
 ## Maintenance Contract
 
 1. Update `docs/SUMMARY.md` and the nearest category index when adding a major doc.
-2. Keep the documentation English-only and use the target LabaClaw surface in user-facing docs.
+2. Keep the documentation English-only and normalize user-facing docs around the target LabaClaw surface.
 3. Limit ZeroClaw mentions to fork provenance, runtime migration status, and upstream sync policy.
-4. Remove stale planning and project-tracking docs instead of carrying them forward once they stop serving the active LabaClaw direction.
+4. Call out unresolved runtime or script gaps anywhere they affect setup, operations, or migration guidance.
+5. Remove stale planning and project-tracking docs instead of carrying them forward once they stop serving the active LabaClaw direction.

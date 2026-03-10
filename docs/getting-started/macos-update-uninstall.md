@@ -13,8 +13,8 @@ labaclaw --version
 
 Typical locations:
 
-- Homebrew: `/opt/homebrew/bin/labaclaw` (Apple Silicon) or `/usr/local/bin/labaclaw` (Intel)
 - Cargo/bootstrap/manual: `~/.cargo/bin/labaclaw`
+- Custom/local binary path: wherever you copied or built `labaclaw`
 
 If both exist, your shell `PATH` order decides which one runs.
 
@@ -27,15 +27,7 @@ labaclaw update --instructions
 labaclaw update --check
 ```
 
-### A) Homebrew install
-
-```bash
-brew update
-brew upgrade labaclaw
-labaclaw --version
-```
-
-### B) Clone + bootstrap install
+### A) Clone + bootstrap install
 
 From your local repository checkout:
 
@@ -53,7 +45,7 @@ cargo install --path . --force --locked
 labaclaw --version
 ```
 
-### C) Manual prebuilt binary install
+### B) Manual prebuilt binary install
 
 Re-run your download/install flow with the latest release asset, then verify:
 
@@ -85,17 +77,12 @@ Service artifacts removed by `service uninstall`:
 
 ### B) Remove the binary by install method
 
-Homebrew:
-
-```bash
-brew uninstall labaclaw
-```
-
 Cargo/bootstrap/manual (`~/.cargo/bin/labaclaw`):
 
 ```bash
 cargo uninstall labaclaw || true
 rm -f ~/.cargo/bin/labaclaw
+rm -f ~/.local/bin/labaclaw
 ```
 
 ### C) Optional: remove local runtime data

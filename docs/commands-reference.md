@@ -129,8 +129,7 @@ Notes:
 
 Notes:
 
-- If LabaClaw is installed via Homebrew, prefer `brew upgrade labaclaw`.
-- `update --instructions` detects common install methods and prints the safest path.
+- `update --instructions` detects common local install methods and otherwise falls back to generic guidance.
 
 ### `cron`
 

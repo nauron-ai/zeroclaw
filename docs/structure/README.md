@@ -33,7 +33,7 @@ Last refreshed: **March 10, 2026**.
 ## Placement Rules
 
 1. English is the only maintained documentation language in this repository.
-2. User-facing docs should use the target LabaClaw surface and naming.
+2. User-facing docs should normalize around the target LabaClaw surface and naming.
 3. ZeroClaw may appear only in:
    - fork provenance statements,
    - runtime migration status notes,
@@ -42,7 +42,8 @@ Last refreshed: **March 10, 2026**.
    - the nearest category index,
    - `docs/SUMMARY.md`,
    - `docs/docs-inventory.md`.
-5. Remove stale plans and project-tracking docs rather than preserving them in the docs spine.
+5. Call out unresolved runtime or script gaps anywhere they affect setup, operations, or migration guidance.
+6. Remove stale plans and project-tracking docs rather than preserving them in the docs spine.
 
 ## Governance Notes
 

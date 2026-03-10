@@ -4,8 +4,8 @@ LabaClaw is a mesh-first, high-performance, distributed Rust runtime for agentic
 It is maintained as a public fork of ZeroClaw and is being reshaped around the Laba mesh baseline.
 
 > **Fork provenance and sync policy**
-> LabaClaw is a public fork of ZeroClaw. This documentation already uses the target LabaClaw surface: `labaclaw`, `~/.labaclaw`, `LABACLAW_*`, `/etc/labaclaw`, and `labaclaw.service`.
-> Parts of the runtime and codebase still carry legacy `zeroclaw` identifiers and will be migrated in a follow-up implementation track.
+> LabaClaw is a public fork of ZeroClaw. The documentation is being normalized around the target LabaClaw surface: `labaclaw`, `~/.labaclaw`, `LABACLAW_*`, `/etc/labaclaw`, and `labaclaw.service`.
+> Parts of the runtime and codebase still carry legacy `zeroclaw` identifiers and are being aligned in a follow-up implementation track.
 > Upstream material may be pulled from ZeroClaw either 1:1 or adapted qualitatively, depending on fit with the LabaClaw mesh, distributed, and high-efficiency direction.
 
 ## Quick Start
@@ -13,7 +13,7 @@ It is maintained as a public fork of ZeroClaw and is being reshaped around the L
 ### Install
 
 ```bash
-brew install labaclaw
+curl -fsSL https://raw.githubusercontent.com/nauron-ai/labaclaw/main/install.sh | bash
 ```
 
 ```bash

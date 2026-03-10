@@ -6,7 +6,7 @@ Last refreshed: **March 10, 2026**.
 
 > **Fork provenance and sync policy**
 > LabaClaw is a public fork of ZeroClaw.
-> The docs use the target LabaClaw operator surface now, while the runtime still contains some legacy `zeroclaw` identifiers that will be migrated in a follow-up implementation track.
+> The docs are being normalized around the target LabaClaw operator surface, while the runtime still contains some legacy `zeroclaw` identifiers that are being migrated in a follow-up implementation track.
 > Future upstream updates may be imported from ZeroClaw either 1:1 or adapted qualitatively when LabaClaw's mesh-first, distributed direction requires it.
 
 ## Start Here
@@ -38,5 +38,5 @@ Last refreshed: **March 10, 2026**.
 ## Reader Notes
 
 - English is the only maintained documentation language in this repository.
-- User-facing docs should use the LabaClaw surface and naming.
+- User-facing docs should use the LabaClaw surface and naming, and should note unresolved runtime gaps where they matter to the reader.
 - Mentions of ZeroClaw are limited to fork provenance, runtime migration status, and upstream sync policy.

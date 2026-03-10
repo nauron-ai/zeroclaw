@@ -4,12 +4,6 @@ This page defines the fastest supported path to install and initialize LabaClaw.
 
 Last verified: **March 4, 2026**.
 
-## Option 0: Homebrew (macOS/Linuxbrew)
-
-```bash
-brew install labaclaw
-```
-
 ## Option A (Recommended): Clone + local script
 
 ```bash

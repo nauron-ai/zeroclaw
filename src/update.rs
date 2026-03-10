@@ -27,7 +27,6 @@ struct Asset {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InstallMethod {
-    Homebrew,
     CargoOrLocal,
     Unknown,
 }
@@ -220,15 +219,6 @@ fn get_current_exe() -> Result<PathBuf> {
 }
 
 fn detect_install_method_for_path(resolved_path: &Path, home_dir: Option<&Path>) -> InstallMethod {
-    let lower = resolved_path.to_string_lossy().to_ascii_lowercase();
-    if lower.contains("/cellar/labaclaw/")
-        || lower.contains("/homebrew/cellar/labaclaw/")
-        || lower.contains("/cellar/zeroclaw/")
-        || lower.contains("/homebrew/cellar/zeroclaw/")
-    {
-        return InstallMethod::Homebrew;
-    }
-
     if let Some(home) = home_dir {
         if resolved_path.starts_with(home.join(".cargo").join("bin"))
             || resolved_path.starts_with(home.join(".local").join("bin"))
@@ -259,17 +249,6 @@ pub fn print_update_instructions() -> Result<()> {
     println!();
 
     match install_method {
-        InstallMethod::Homebrew => {
-            println!("Detected install method: Homebrew");
-            println!("Recommended update commands:");
-            println!("  brew update");
-            println!("  brew upgrade labaclaw");
-            println!("  labaclaw --version");
-            println!();
-            println!(
-                "Tip: avoid `labaclaw update` on Homebrew installs unless you intentionally want to override the managed binary."
-            );
-        }
         InstallMethod::CargoOrLocal => {
             println!("Detected install method: local binary (~/.cargo/bin or ~/.local/bin)");
             println!("Recommended update command:");
@@ -373,7 +352,6 @@ pub async fn self_update(force: bool, check_only: bool) -> Result<()> {
     println!();
 
     let current_exe = get_current_exe()?;
-    let install_method = detect_install_method(&current_exe);
     println!("Current binary: {}", current_exe.display());
     println!("Current version: v{}", current_version());
     println!();
@@ -396,16 +374,6 @@ pub async fn self_update(force: bool, check_only: bool) -> Result<()> {
             );
             println!("Run `labaclaw update` to install the update.");
         }
-        return Ok(());
-    }
-
-    if install_method == InstallMethod::Homebrew && !force {
-        println!();
-        println!("Detected a Homebrew-managed installation.");
-        println!("Use `brew upgrade labaclaw` for the safest update path.");
-        println!(
-            "Run `labaclaw update --force` only if you intentionally want to override Homebrew."
-        );
         return Ok(());
     }
 
@@ -460,13 +428,6 @@ mod tests {
             get_archive_name("x86_64-unknown-linux-gnu"),
             "labaclaw-x86_64-unknown-linux-gnu.tar.gz"
         );
-    }
-
-    #[test]
-    fn detect_install_method_identifies_homebrew_paths() {
-        let path = Path::new("/opt/homebrew/Cellar/labaclaw/0.1.7/bin/labaclaw");
-        let method = detect_install_method_for_path(path, None);
-        assert_eq!(method, InstallMethod::Homebrew);
     }
 
     #[test]
