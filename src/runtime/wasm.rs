@@ -793,7 +793,7 @@ mod tests {
     #[test]
     fn wasm_storage_path_default() {
         let rt = WasmRuntime::new(default_config());
-        assert!(rt.storage_path().to_string_lossy().contains("zeroclaw"));
+        assert!(rt.storage_path().to_string_lossy().contains("labaclaw"));
     }
 
     #[test]

@@ -232,9 +232,9 @@ mod tests {
     }
 
     #[test]
-    fn native_storage_path_contains_zeroclaw() {
+    fn native_storage_path_contains_labaclaw() {
         let path = NativeRuntime::new().storage_path();
-        assert!(path.to_string_lossy().contains("zeroclaw"));
+        assert!(path.to_string_lossy().contains("labaclaw"));
     }
 
     #[test]

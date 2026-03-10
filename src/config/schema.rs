@@ -6857,18 +6857,16 @@ pub(crate) fn resolve_config_dir_for_workspace(workspace_dir: &Path) -> (PathBuf
     }
 
     if let Some(parent) = workspace_dir.parent() {
-        for dir_name in [LABACLAW_CONFIG_DIR_NAME] {
-            let config_dir = parent.join(dir_name);
-            if config_dir.join("config.toml").exists() {
-                return (config_dir, workspace_config_dir);
-            }
+        let config_dir = parent.join(LABACLAW_CONFIG_DIR_NAME);
+        if config_dir.join("config.toml").exists() {
+            return (config_dir, workspace_config_dir);
+        }
 
-            if workspace_dir
-                .file_name()
-                .is_some_and(|name| name == std::ffi::OsStr::new("workspace"))
-            {
-                return (config_dir, workspace_config_dir);
-            }
+        if workspace_dir
+            .file_name()
+            .is_some_and(|name| name == std::ffi::OsStr::new("workspace"))
+        {
+            return (config_dir, workspace_config_dir);
         }
     }
 

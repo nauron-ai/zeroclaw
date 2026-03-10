@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn allowlist_supports_wildcards() {
-        let ch = GitHubChannel::new("t".into(), None, vec!["zeroclaw-labs/*".into()]);
+        let ch = GitHubChannel::new("t".into(), None, vec!["nauron-ai/*".into()]);
         assert!(ch.repo_is_allowed("nauron-ai/labaclaw"));
         assert!(!ch.repo_is_allowed("other/repo"));
         let all = GitHubChannel::new("t".into(), None, vec!["*".into()]);

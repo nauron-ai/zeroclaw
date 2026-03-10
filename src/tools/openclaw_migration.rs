@@ -316,6 +316,7 @@ mod tests {
         seed_openclaw_workspace(source.path());
 
         let config = test_config(&target);
+        config.save().await.unwrap();
         let tool =
             OpenClawMigrationTool::new(Arc::new(config), Arc::new(SecurityPolicy::default()));
 
@@ -329,7 +330,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(result.success);
+        assert!(result.success, "{result:?}");
         assert!(result.output.contains("\"dry_run\": true"));
     }
 }
