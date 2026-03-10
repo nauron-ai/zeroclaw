@@ -4,22 +4,22 @@ This page is the evergreen security statement for community safety and impersona
 
 ## Fraud Warning
 
-Scammers may impersonate ZeroClaw maintainers, contributors, or community members.
+Scammers may impersonate LabaClaw maintainers, contributors, or community members.
 
-Assume fraud if someone claiming to represent ZeroClaw asks for:
+Assume fraud if someone claiming to represent LabaClaw asks for:
 
 - cryptocurrency transfers
 - wallet access or seed phrases
 - private financial information
 - private credentials outside official security reporting flow
 
-ZeroClaw maintainers do not request money or private wallet/financial credentials via direct messages.
+LabaClaw maintainers do not request money or private wallet/financial credentials via direct messages.
 
 ## Official Sources Of Truth
 
 Use these sources to verify announcements:
 
-- GitHub repository: `zeroclaw-labs/zeroclaw`
+- GitHub repository: `nauron-ai/labaclaw`
 - GitHub Security policy and advisories: [../../SECURITY.md](../../SECURITY.md)
 
 Treat third-party links and social posts as untrusted until confirmed in the GitHub repository.
@@ -36,7 +36,7 @@ If you see impersonation attempts or scam outreach:
 
 1. Do not engage or send funds/data.
 2. Capture evidence (screenshots, usernames, URLs, timestamps).
-3. Open a GitHub issue in `zeroclaw-labs/zeroclaw` with sanitized details.
+3. Open a GitHub issue in `nauron-ai/labaclaw` with sanitized details.
 
 For vulnerability disclosure, use private reporting:
 

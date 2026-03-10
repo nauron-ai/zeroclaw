@@ -1,20 +1,20 @@
 # macOS Update and Uninstall Guide
 
-This page documents supported update and uninstall procedures for ZeroClaw on macOS (OS X).
+This page documents supported update and uninstall procedures for LabaClaw on macOS (OS X).
 
 Last verified: **February 22, 2026**.
 
 ## 1) Check current install method
 
 ```bash
-which zeroclaw
-zeroclaw --version
+which labaclaw
+labaclaw --version
 ```
 
 Typical locations:
 
-- Homebrew: `/opt/homebrew/bin/zeroclaw` (Apple Silicon) or `/usr/local/bin/zeroclaw` (Intel)
-- Cargo/bootstrap/manual: `~/.cargo/bin/zeroclaw`
+- Homebrew: `/opt/homebrew/bin/labaclaw` (Apple Silicon) or `/usr/local/bin/labaclaw` (Intel)
+- Cargo/bootstrap/manual: `~/.cargo/bin/labaclaw`
 
 If both exist, your shell `PATH` order decides which one runs.
 
@@ -23,16 +23,16 @@ If both exist, your shell `PATH` order decides which one runs.
 Quick way to get install-method-specific guidance:
 
 ```bash
-zeroclaw update --instructions
-zeroclaw update --check
+labaclaw update --instructions
+labaclaw update --check
 ```
 
 ### A) Homebrew install
 
 ```bash
 brew update
-brew upgrade zeroclaw
-zeroclaw --version
+brew upgrade labaclaw
+labaclaw --version
 ```
 
 ### B) Clone + bootstrap install
@@ -42,7 +42,7 @@ From your local repository checkout:
 ```bash
 git pull --ff-only
 ./bootstrap.sh --prefer-prebuilt
-zeroclaw --version
+labaclaw --version
 ```
 
 If you want source-only update:
@@ -50,7 +50,7 @@ If you want source-only update:
 ```bash
 git pull --ff-only
 cargo install --path . --force --locked
-zeroclaw --version
+labaclaw --version
 ```
 
 ### C) Manual prebuilt binary install
@@ -58,14 +58,14 @@ zeroclaw --version
 Re-run your download/install flow with the latest release asset, then verify:
 
 ```bash
-zeroclaw --version
+labaclaw --version
 ```
 
 You can also use the built-in updater for manual/local installs:
 
 ```bash
-zeroclaw update
-zeroclaw --version
+labaclaw update
+labaclaw --version
 ```
 
 ## 3) Uninstall on macOS
@@ -75,27 +75,27 @@ zeroclaw --version
 This prevents the daemon from continuing to run after binary removal.
 
 ```bash
-zeroclaw service stop || true
-zeroclaw service uninstall || true
+labaclaw service stop || true
+labaclaw service uninstall || true
 ```
 
 Service artifacts removed by `service uninstall`:
 
-- `~/Library/LaunchAgents/com.zeroclaw.daemon.plist`
+- `~/Library/LaunchAgents/com.labaclaw.daemon.plist`
 
 ### B) Remove the binary by install method
 
 Homebrew:
 
 ```bash
-brew uninstall zeroclaw
+brew uninstall labaclaw
 ```
 
-Cargo/bootstrap/manual (`~/.cargo/bin/zeroclaw`):
+Cargo/bootstrap/manual (`~/.cargo/bin/labaclaw`):
 
 ```bash
-cargo uninstall zeroclaw || true
-rm -f ~/.cargo/bin/zeroclaw
+cargo uninstall labaclaw || true
+rm -f ~/.cargo/bin/labaclaw
 ```
 
 ### C) Optional: remove local runtime data
@@ -103,20 +103,20 @@ rm -f ~/.cargo/bin/zeroclaw
 Only run this if you want a full cleanup of config, auth profiles, logs, and workspace state.
 
 ```bash
-rm -rf ~/.zeroclaw
+rm -rf ~/.labaclaw
 ```
 
 ## 4) Verify uninstall completed
 
 ```bash
-command -v zeroclaw || echo "zeroclaw binary not found"
-pgrep -fl zeroclaw || echo "No running zeroclaw process"
+command -v labaclaw || echo "labaclaw binary not found"
+pgrep -fl labaclaw || echo "No running labaclaw process"
 ```
 
 If `pgrep` still finds a process, stop it manually and re-check:
 
 ```bash
-pkill -f zeroclaw
+pkill -f labaclaw
 ```
 
 ## Related docs

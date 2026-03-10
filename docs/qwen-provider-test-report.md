@@ -1,7 +1,7 @@
 # Qwen Provider Integration Test Report
 
 **Date:** 2026-02-24
-**Tester:** ZeroClaw Agent (automated testing)
+**Tester:** LabaClaw Agent (automated testing)
 **Provider:** `qwen-code` (OAuth-based, portal.qwen.ai)
 **Status:** ✅ **READY FOR PRODUCTION**
 
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Qwen OAuth integration has been successfully validated and configured for ZeroClaw. The provider is **ready for production use** with the following characteristics:
+Qwen OAuth integration has been successfully validated and configured for LabaClaw. The provider is **ready for production use** with the following characteristics:
 
 - **Available Models:** 1 (qwen3-coder-plus)
 - **Context Window:** ~32K tokens
@@ -81,11 +81,11 @@ Qwen OAuth integration has been successfully validated and configured for ZeroCl
 
 ---
 
-## 4. ZeroClaw Integration Testing
+## 4. LabaClaw Integration Testing
 
 ### 4.1 Configuration
 
-**File:** `/home/spex/.zeroclaw/config.toml`
+**File:** `/home/spex/.labaclaw/config.toml`
 
 **Provider Configuration:**
 ```toml
@@ -366,7 +366,7 @@ All test scripts are located in `scripts/`:
 
 **Usage:**
 ```bash
-cd /home/spex/work/erp/zeroclaws
+cd /home/spex/work/erp/labaclaw
 ./scripts/qwen_model_probe.sh
 ./scripts/qwen_context_test.sh
 ./scripts/qwen_latency_benchmark.sh

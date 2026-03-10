@@ -1,4 +1,4 @@
-# ZeroClaw Release Process
+# LabaClaw Release Process
 
 This runbook defines the binary-only release flow for this fork.
 

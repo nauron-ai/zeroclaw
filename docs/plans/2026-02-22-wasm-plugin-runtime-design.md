@@ -2,7 +2,7 @@
 
 ## Context
 
-ZeroClaw currently uses in-process trait/factory extension points for providers, tools, channels, memory, runtime adapters, observers, peripherals, and hooks. Hook interfaces exist, but several lifecycle events are either missing or not wired in runtime paths.
+LabaClaw currently uses in-process trait/factory extension points for providers, tools, channels, memory, runtime adapters, observers, peripherals, and hooks. Hook interfaces exist, but several lifecycle events are either missing or not wired in runtime paths.
 
 ## Objective
 
@@ -42,7 +42,7 @@ Add `src/plugins/` as first-class subsystem:
 
 ### 2. WIT Contracts
 
-Define separate contracts under `wit/zeroclaw/`:
+Define separate contracts under `wit/labaclaw/`:
 - `hooks/v1`
 - `tools/v1`
 - `providers/v1`

@@ -1,4 +1,4 @@
-# ZeroClaw Config Reference (Operator-Oriented)
+# LabaClaw Config Reference (Operator-Oriented)
 
 This is a high-signal reference for common config sections and defaults.
 
@@ -6,20 +6,20 @@ Last verified: **February 28, 2026**.
 
 Config path resolution at startup:
 
-1. `ZEROCLAW_WORKSPACE` override (if set)
-2. persisted `~/.zeroclaw/active_workspace.toml` marker (if present)
-3. default `~/.zeroclaw/config.toml`
+1. `LABACLAW_WORKSPACE` override (if set)
+2. persisted `~/.labaclaw/active_workspace.toml` marker (if present)
+3. default `~/.labaclaw/config.toml`
 
-ZeroClaw logs the resolved config on startup at `INFO` level:
+LabaClaw logs the resolved config on startup at `INFO` level:
 
 - `Config loaded` with fields: `path`, `workspace`, `source`, `initialized`
 
 CLI commands for config inspection and modification:
 
-- `zeroclaw config show` — print effective config as JSON (secrets masked)
-- `zeroclaw config get <key>` — query a value by dot-path (e.g. `zeroclaw config get gateway.port`)
-- `zeroclaw config set <key> <value>` — update a value and save to `config.toml`
-- `zeroclaw config schema` — print JSON Schema (draft 2020-12) to stdout
+- `labaclaw config show` — print effective config as JSON (secrets masked)
+- `labaclaw config get <key>` — query a value by dot-path (e.g. `labaclaw config get gateway.port`)
+- `labaclaw config set <key> <value>` — update a value and save to `config.toml`
+- `labaclaw config schema` — print JSON Schema (draft 2020-12) to stdout
 
 ## Core Keys
 
@@ -36,7 +36,7 @@ Notes:
 - `model_support_vision = true` forces vision support on (e.g. Ollama running `llava`).
 - `model_support_vision = false` forces vision support off.
 - Unset keeps the provider's built-in default.
-- Environment override: `ZEROCLAW_MODEL_SUPPORT_VISION` or `MODEL_SUPPORT_VISION` (values: `true`/`false`/`1`/`0`/`yes`/`no`/`on`/`off`).
+- Environment override: `LABACLAW_MODEL_SUPPORT_VISION` or `MODEL_SUPPORT_VISION` (values: `true`/`false`/`1`/`0`/`yes`/`no`/`on`/`off`).
 
 ## `[model_providers.<profile>]`
 
@@ -78,7 +78,7 @@ api_key = "sk-profile-key"
 |---|---|---|
 | `backend` | `none` | Observability backend: `none`, `noop`, `log`, `prometheus`, `otel`, `opentelemetry`, or `otlp` |
 | `otel_endpoint` | `http://localhost:4318` | OTLP HTTP endpoint used when backend is `otel` |
-| `otel_service_name` | `zeroclaw` | Service name emitted to OTLP collector |
+| `otel_service_name` | `labaclaw` | Service name emitted to OTLP collector |
 | `runtime_trace_mode` | `none` | Runtime trace storage mode: `none`, `rolling`, or `full` |
 | `runtime_trace_path` | `state/runtime-trace.jsonl` | Runtime trace JSONL path (relative to workspace unless absolute) |
 | `runtime_trace_max_entries` | `200` | Maximum retained events when `runtime_trace_mode = "rolling"` |
@@ -89,9 +89,9 @@ Notes:
 - Alias values `opentelemetry` and `otlp` map to the same OTel backend.
 - Runtime traces are intended for debugging tool-call failures and malformed model tool payloads. They can contain model output text, so keep this disabled by default on shared hosts.
 - Query runtime traces with:
-  - `zeroclaw doctor traces --limit 20`
-  - `zeroclaw doctor traces --event tool_call_result --contains \"error\"`
-  - `zeroclaw doctor traces --id <trace-id>`
+  - `labaclaw doctor traces --limit 20`
+  - `labaclaw doctor traces --event tool_call_result --contains \"error\"`
+  - `labaclaw doctor traces --id <trace-id>`
 
 Example:
 
@@ -99,7 +99,7 @@ Example:
 [observability]
 backend = "otel"
 otel_endpoint = "http://localhost:4318"
-otel_service_name = "zeroclaw"
+otel_service_name = "labaclaw"
 runtime_trace_mode = "rolling"
 runtime_trace_path = "state/runtime-trace.jsonl"
 runtime_trace_max_entries = 200
@@ -109,17 +109,17 @@ runtime_trace_max_entries = 200
 
 Provider selection can also be controlled by environment variables. Precedence is:
 
-1. `ZEROCLAW_PROVIDER` (explicit override, always wins when non-empty)
+1. `LABACLAW_PROVIDER` (explicit override, always wins when non-empty)
 2. `PROVIDER` (legacy fallback, only applied when config provider is unset or still `openrouter`)
 3. `default_provider` in `config.toml`
 
 Operational note for container users:
 
 - If your `config.toml` sets an explicit custom provider like `custom:https://.../v1`, a default `PROVIDER=openrouter` from Docker/container env will no longer replace it.
-- Use `ZEROCLAW_PROVIDER` when you intentionally want runtime env to override a non-default configured provider.
+- Use `LABACLAW_PROVIDER` when you intentionally want runtime env to override a non-default configured provider.
 - For OpenAI-compatible Responses fallback transport:
-  - `ZEROCLAW_RESPONSES_WEBSOCKET=1` forces websocket-first mode (`wss://.../responses`) for compatible providers.
-  - `ZEROCLAW_RESPONSES_WEBSOCKET=0` forces HTTP-only mode.
+  - `LABACLAW_RESPONSES_WEBSOCKET=1` forces websocket-first mode (`wss://.../responses`) for compatible providers.
+  - `LABACLAW_RESPONSES_WEBSOCKET=0` forces HTTP-only mode.
   - Unset = auto (websocket-first only when endpoint host is `api.openai.com`, then HTTP fallback if websocket fails).
 
 ## `[agent]`
@@ -280,7 +280,7 @@ Notes:
 - Domain patterns support wildcard `*`.
 - Category presets expand to curated domain sets during validation.
 - Invalid domain globs or unknown categories fail fast at startup.
-- When `enabled = true` and no OTP secret exists, ZeroClaw generates one and prints an enrollment URI once.
+- When `enabled = true` and no OTP secret exists, LabaClaw generates one and prints an enrollment URI once.
 
 Example:
 
@@ -300,14 +300,14 @@ gated_domain_categories = ["banking"]
 | Key | Default | Purpose |
 |---|---|---|
 | `enabled` | `false` | Enable emergency-stop state machine and CLI |
-| `state_file` | `~/.zeroclaw/estop-state.json` | Persistent estop state path |
+| `state_file` | `~/.labaclaw/estop-state.json` | Persistent estop state path |
 | `require_otp_to_resume` | `true` | Require OTP validation before resume operations |
 
 Notes:
 
 - Estop state is persisted atomically and reloaded on startup.
 - Corrupted/unreadable estop state falls back to fail-closed `kill_all`.
-- Use CLI command `zeroclaw estop` to engage and `zeroclaw estop resume` to clear levels.
+- Use CLI command `labaclaw estop` to engage and `labaclaw estop resume` to clear levels.
 
 ## `[security.url_access]`
 
@@ -390,15 +390,15 @@ Operational guidance:
 
 Environment overrides:
 
-- `ZEROCLAW_URL_ACCESS_BLOCK_PRIVATE_IP` / `URL_ACCESS_BLOCK_PRIVATE_IP`
-- `ZEROCLAW_URL_ACCESS_ALLOW_LOOPBACK` / `URL_ACCESS_ALLOW_LOOPBACK`
-- `ZEROCLAW_URL_ACCESS_REQUIRE_FIRST_VISIT_APPROVAL` / `URL_ACCESS_REQUIRE_FIRST_VISIT_APPROVAL`
-- `ZEROCLAW_URL_ACCESS_ENFORCE_DOMAIN_ALLOWLIST` / `URL_ACCESS_ENFORCE_DOMAIN_ALLOWLIST`
-- `ZEROCLAW_URL_ACCESS_ALLOW_CIDRS` / `URL_ACCESS_ALLOW_CIDRS` (comma-separated)
-- `ZEROCLAW_URL_ACCESS_ALLOW_DOMAINS` / `URL_ACCESS_ALLOW_DOMAINS` (comma-separated)
-- `ZEROCLAW_URL_ACCESS_DOMAIN_ALLOWLIST` / `URL_ACCESS_DOMAIN_ALLOWLIST` (comma-separated)
-- `ZEROCLAW_URL_ACCESS_DOMAIN_BLOCKLIST` / `URL_ACCESS_DOMAIN_BLOCKLIST` (comma-separated)
-- `ZEROCLAW_URL_ACCESS_APPROVED_DOMAINS` / `URL_ACCESS_APPROVED_DOMAINS` (comma-separated)
+- `LABACLAW_URL_ACCESS_BLOCK_PRIVATE_IP` / `URL_ACCESS_BLOCK_PRIVATE_IP`
+- `LABACLAW_URL_ACCESS_ALLOW_LOOPBACK` / `URL_ACCESS_ALLOW_LOOPBACK`
+- `LABACLAW_URL_ACCESS_REQUIRE_FIRST_VISIT_APPROVAL` / `URL_ACCESS_REQUIRE_FIRST_VISIT_APPROVAL`
+- `LABACLAW_URL_ACCESS_ENFORCE_DOMAIN_ALLOWLIST` / `URL_ACCESS_ENFORCE_DOMAIN_ALLOWLIST`
+- `LABACLAW_URL_ACCESS_ALLOW_CIDRS` / `URL_ACCESS_ALLOW_CIDRS` (comma-separated)
+- `LABACLAW_URL_ACCESS_ALLOW_DOMAINS` / `URL_ACCESS_ALLOW_DOMAINS` (comma-separated)
+- `LABACLAW_URL_ACCESS_DOMAIN_ALLOWLIST` / `URL_ACCESS_DOMAIN_ALLOWLIST` (comma-separated)
+- `LABACLAW_URL_ACCESS_DOMAIN_BLOCKLIST` / `URL_ACCESS_DOMAIN_BLOCKLIST` (comma-separated)
+- `LABACLAW_URL_ACCESS_APPROVED_DOMAINS` / `URL_ACCESS_APPROVED_DOMAINS` (comma-separated)
 
 ## `[security]`
 
@@ -658,16 +658,16 @@ WASM profile templates:
 Notes:
 
 - Supported values: `minimal`, `low`, `medium`, `high`, `xhigh` (case-insensitive).
-- When set, overrides `ZEROCLAW_CODEX_REASONING_EFFORT` for OpenAI Codex requests.
-- Unset falls back to `ZEROCLAW_CODEX_REASONING_EFFORT` if present, otherwise defaults to `xhigh`.
+- When set, overrides `LABACLAW_CODEX_REASONING_EFFORT` for OpenAI Codex requests.
+- Unset falls back to `LABACLAW_CODEX_REASONING_EFFORT` if present, otherwise defaults to `xhigh`.
 - If both `provider.reasoning_level` and deprecated `runtime.reasoning_level` are set, provider-level value wins.
 - `provider.transport` is normalized case-insensitively (`ws` aliases to `websocket`; `http` aliases to `sse`).
 - For OpenAI Codex, default transport mode is `auto` (WebSocket-first with SSE fallback).
 - Transport override precedence for OpenAI Codex:
   1. `[[model_routes]].transport` (route-specific)
-  2. `PROVIDER_TRANSPORT` / `ZEROCLAW_PROVIDER_TRANSPORT` / `ZEROCLAW_CODEX_TRANSPORT`
+  2. `PROVIDER_TRANSPORT` / `LABACLAW_PROVIDER_TRANSPORT` / `LABACLAW_CODEX_TRANSPORT`
   3. `provider.transport`
-  4. legacy `ZEROCLAW_RESPONSES_WEBSOCKET` (boolean)
+  4. legacy `LABACLAW_RESPONSES_WEBSOCKET` (boolean)
 - Environment overrides replace configured `provider.transport` when set.
 
 ## `[skills]`
@@ -682,15 +682,15 @@ Notes:
 
 Notes:
 
-- Security-first default: ZeroClaw does **not** clone or sync `open-skills` unless `open_skills_enabled = true`.
+- Security-first default: LabaClaw does **not** clone or sync `open-skills` unless `open_skills_enabled = true`.
 - Environment overrides:
-  - `ZEROCLAW_OPEN_SKILLS_ENABLED` accepts `1/0`, `true/false`, `yes/no`, `on/off`.
-  - `ZEROCLAW_OPEN_SKILLS_DIR` overrides the repository path when non-empty.
-  - `ZEROCLAW_SKILLS_PROMPT_MODE` accepts `full` or `compact`.
-- Precedence for enable flag: `ZEROCLAW_OPEN_SKILLS_ENABLED` → `skills.open_skills_enabled` in `config.toml` → default `false`.
+  - `LABACLAW_OPEN_SKILLS_ENABLED` accepts `1/0`, `true/false`, `yes/no`, `on/off`.
+  - `LABACLAW_OPEN_SKILLS_DIR` overrides the repository path when non-empty.
+  - `LABACLAW_SKILLS_PROMPT_MODE` accepts `full` or `compact`.
+- Precedence for enable flag: `LABACLAW_OPEN_SKILLS_ENABLED` → `skills.open_skills_enabled` in `config.toml` → default `false`.
 - `prompt_injection_mode = "compact"` is recommended on low-context local models to reduce startup prompt size while keeping skill files available on demand.
 - Symlinked workspace skills are blocked by default. Set `trusted_skill_roots` to allow local shared-skill directories after explicit trust review.
-- `zeroclaw skills install` and `zeroclaw skills audit` apply a static security audit. Skills that contain script-like files, high-risk shell payload snippets, or unsafe markdown link traversal are rejected.
+- `labaclaw skills install` and `labaclaw skills audit` apply a static security audit. Skills that contain script-like files, high-risk shell payload snippets, or unsafe markdown link traversal are rejected.
 - `clawhub_token` is sent as `Authorization: Bearer <token>` when downloading from ClawhHub. Obtain a token from [https://clawhub.ai](https://clawhub.ai) after signing in. Required if the API returns 429 (rate-limited) or 401 (unauthorized) for anonymous requests.
 
 **ClawhHub token example:**
@@ -712,7 +712,7 @@ Notes:
 
 - Backward compatibility: legacy `enable = true` is accepted as an alias for `enabled = true`.
 - If `enabled = false` or `api_key` is missing, the `composio` tool is not registered.
-- ZeroClaw requests Composio v3 tools with `toolkit_versions=latest` and executes tools with `version="latest"` to avoid stale default tool revisions.
+- LabaClaw requests Composio v3 tools with `toolkit_versions=latest` and executes tools with `version="latest"` to avoid stale default tool revisions.
 - Typical flow: call `connect`, complete browser OAuth, then run `execute` for the desired tool action.
 - If Composio returns a missing connected-account reference error, call `list_accounts` (optionally with `app`) and pass the returned `connected_account_id` to `execute`.
 
@@ -812,7 +812,7 @@ Notes:
 | `allowed_domains` | `[]` | Allowed domains for HTTP requests (exact/subdomain match, or `"*"` for all public domains) |
 | `max_response_size` | `1000000` | Maximum response size in bytes (default: 1 MB) |
 | `timeout_secs` | `30` | Request timeout in seconds |
-| `user_agent` | `ZeroClaw/1.0` | User-Agent header for outbound HTTP requests |
+| `user_agent` | `LabaClaw/1.0` | User-Agent header for outbound HTTP requests |
 | `credential_profiles` | `{}` | Optional named env-backed auth profiles used by tool arg `credential_profile` |
 
 Notes:
@@ -828,17 +828,17 @@ Example:
 ```toml
 [http_request]
 enabled = true
-allowed_domains = ["api.github.com", "api.linear.app"]
+allowed_domains = ["api.github.com", "api.example.com"]
 
 [http_request.credential_profiles.github]
 header_name = "Authorization"
 env_var = "GITHUB_TOKEN"
 value_prefix = "Bearer "
 
-[http_request.credential_profiles.linear]
+[http_request.credential_profiles.service_api]
 header_name = "Authorization"
-env_var = "LINEAR_API_KEY"
-value_prefix = ""
+env_var = "SERVICE_API_TOKEN"
+value_prefix = "Bearer "
 ```
 
 Then call `http_request` with:
@@ -864,7 +864,7 @@ When using `credential_profile`, do not also set the same header key in `args.he
 | `blocked_domains` | `[]` | Denylist applied before allowlist |
 | `max_response_size` | `500000` | Maximum returned payload size in bytes |
 | `timeout_secs` | `30` | Request timeout in seconds |
-| `user_agent` | `ZeroClaw/1.0` | User-Agent header for fetch requests |
+| `user_agent` | `LabaClaw/1.0` | User-Agent header for fetch requests |
 
 Notes:
 
@@ -898,7 +898,7 @@ Notes:
 | `jina_site_filters` | `[]` | Optional site filters for Jina search |
 | `max_results` | `5` | Maximum search results returned (must be 1-10) |
 | `timeout_secs` | `15` | Request timeout in seconds |
-| `user_agent` | `ZeroClaw/1.0` | User-Agent header for search requests |
+| `user_agent` | `LabaClaw/1.0` | User-Agent header for search requests |
 
 Notes:
 
@@ -957,26 +957,26 @@ Runtime workflow (`web_search_config`):
 
 Environment overrides:
 
-- `ZEROCLAW_WEB_SEARCH_ENABLED` / `WEB_SEARCH_ENABLED`
-- `ZEROCLAW_WEB_SEARCH_PROVIDER` / `WEB_SEARCH_PROVIDER`
-- `ZEROCLAW_WEB_SEARCH_MAX_RESULTS` / `WEB_SEARCH_MAX_RESULTS`
-- `ZEROCLAW_WEB_SEARCH_TIMEOUT_SECS` / `WEB_SEARCH_TIMEOUT_SECS`
-- `ZEROCLAW_WEB_SEARCH_FALLBACK_PROVIDERS` / `WEB_SEARCH_FALLBACK_PROVIDERS` (comma-separated)
-- `ZEROCLAW_WEB_SEARCH_RETRIES_PER_PROVIDER` / `WEB_SEARCH_RETRIES_PER_PROVIDER`
-- `ZEROCLAW_WEB_SEARCH_RETRY_BACKOFF_MS` / `WEB_SEARCH_RETRY_BACKOFF_MS`
-- `ZEROCLAW_WEB_SEARCH_DOMAIN_FILTER` / `WEB_SEARCH_DOMAIN_FILTER` (comma-separated)
-- `ZEROCLAW_WEB_SEARCH_LANGUAGE_FILTER` / `WEB_SEARCH_LANGUAGE_FILTER` (comma-separated)
-- `ZEROCLAW_WEB_SEARCH_COUNTRY` / `WEB_SEARCH_COUNTRY`
-- `ZEROCLAW_WEB_SEARCH_RECENCY_FILTER` / `WEB_SEARCH_RECENCY_FILTER`
-- `ZEROCLAW_WEB_SEARCH_MAX_TOKENS` / `WEB_SEARCH_MAX_TOKENS`
-- `ZEROCLAW_WEB_SEARCH_MAX_TOKENS_PER_PAGE` / `WEB_SEARCH_MAX_TOKENS_PER_PAGE`
-- `ZEROCLAW_WEB_SEARCH_EXA_SEARCH_TYPE` / `WEB_SEARCH_EXA_SEARCH_TYPE`
-- `ZEROCLAW_WEB_SEARCH_EXA_INCLUDE_TEXT` / `WEB_SEARCH_EXA_INCLUDE_TEXT`
-- `ZEROCLAW_WEB_SEARCH_JINA_SITE_FILTERS` / `WEB_SEARCH_JINA_SITE_FILTERS` (comma-separated)
-- `ZEROCLAW_BRAVE_API_KEY` / `BRAVE_API_KEY`
-- `ZEROCLAW_PERPLEXITY_API_KEY` / `PERPLEXITY_API_KEY`
-- `ZEROCLAW_EXA_API_KEY` / `EXA_API_KEY`
-- `ZEROCLAW_JINA_API_KEY` / `JINA_API_KEY`
+- `LABACLAW_WEB_SEARCH_ENABLED` / `WEB_SEARCH_ENABLED`
+- `LABACLAW_WEB_SEARCH_PROVIDER` / `WEB_SEARCH_PROVIDER`
+- `LABACLAW_WEB_SEARCH_MAX_RESULTS` / `WEB_SEARCH_MAX_RESULTS`
+- `LABACLAW_WEB_SEARCH_TIMEOUT_SECS` / `WEB_SEARCH_TIMEOUT_SECS`
+- `LABACLAW_WEB_SEARCH_FALLBACK_PROVIDERS` / `WEB_SEARCH_FALLBACK_PROVIDERS` (comma-separated)
+- `LABACLAW_WEB_SEARCH_RETRIES_PER_PROVIDER` / `WEB_SEARCH_RETRIES_PER_PROVIDER`
+- `LABACLAW_WEB_SEARCH_RETRY_BACKOFF_MS` / `WEB_SEARCH_RETRY_BACKOFF_MS`
+- `LABACLAW_WEB_SEARCH_DOMAIN_FILTER` / `WEB_SEARCH_DOMAIN_FILTER` (comma-separated)
+- `LABACLAW_WEB_SEARCH_LANGUAGE_FILTER` / `WEB_SEARCH_LANGUAGE_FILTER` (comma-separated)
+- `LABACLAW_WEB_SEARCH_COUNTRY` / `WEB_SEARCH_COUNTRY`
+- `LABACLAW_WEB_SEARCH_RECENCY_FILTER` / `WEB_SEARCH_RECENCY_FILTER`
+- `LABACLAW_WEB_SEARCH_MAX_TOKENS` / `WEB_SEARCH_MAX_TOKENS`
+- `LABACLAW_WEB_SEARCH_MAX_TOKENS_PER_PAGE` / `WEB_SEARCH_MAX_TOKENS_PER_PAGE`
+- `LABACLAW_WEB_SEARCH_EXA_SEARCH_TYPE` / `WEB_SEARCH_EXA_SEARCH_TYPE`
+- `LABACLAW_WEB_SEARCH_EXA_INCLUDE_TEXT` / `WEB_SEARCH_EXA_INCLUDE_TEXT`
+- `LABACLAW_WEB_SEARCH_JINA_SITE_FILTERS` / `WEB_SEARCH_JINA_SITE_FILTERS` (comma-separated)
+- `LABACLAW_BRAVE_API_KEY` / `BRAVE_API_KEY`
+- `LABACLAW_PERPLEXITY_API_KEY` / `PERPLEXITY_API_KEY`
+- `LABACLAW_EXA_API_KEY` / `EXA_API_KEY`
+- `LABACLAW_JINA_API_KEY` / `JINA_API_KEY`
 
 ## `[gateway]`
 
@@ -1155,7 +1155,7 @@ Upgrade strategy:
 
 1. Keep hints stable (`hint:reasoning`, `hint:semantic`).
 2. Update only `model = "...new-version..."` in the route entries.
-3. Validate with `zeroclaw doctor` before restart/rollout.
+3. Validate with `labaclaw doctor` before restart/rollout.
 
 Natural-language config path:
 
@@ -1242,7 +1242,7 @@ Notes:
   custom emoji pools, and conditional rules.
 - Legacy `mention_only` flags (Telegram/Discord/Mattermost/Lark) remain supported as fallback only.
   If `group_reply.mode` is set, it takes precedence over legacy `mention_only`.
-- While `zeroclaw channel start` is running, updates to `default_provider`, `default_model`, `default_temperature`, `api_key`, `api_url`, and `reliability.*` are hot-applied from `config.toml` on the next inbound message.
+- While `labaclaw channel start` is running, updates to `default_provider`, `default_model`, `default_temperature`, `api_key`, `api_url`, and `reliability.*` are hot-applied from `config.toml` on the next inbound message.
 
 ### `[channels_config.ack_reaction.<channel>]`
 
@@ -1358,7 +1358,7 @@ Linq Partner V3 API integration for iMessage, RCS, and SMS.
 Notes:
 
 - Webhook endpoint is `POST /linq`.
-- `ZEROCLAW_LINQ_SIGNING_SECRET` overrides `signing_secret` when set.
+- `LABACLAW_LINQ_SIGNING_SECRET` overrides `signing_secret` when set.
 - Signatures use `X-Webhook-Signature` and `X-Webhook-Timestamp` headers; stale timestamps (>300s) are rejected.
 - See [channels-reference.md](channels-reference.md) for full config examples.
 
@@ -1376,7 +1376,7 @@ Native Nextcloud Talk bot integration (webhook receive + OCS send API).
 Notes:
 
 - Webhook endpoint is `POST /nextcloud-talk`.
-- `ZEROCLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides `webhook_secret` when set.
+- `LABACLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides `webhook_secret` when set.
 - See [nextcloud-talk-setup.md](nextcloud-talk-setup.md) for setup and troubleshooting.
 
 ## `[hardware]`
@@ -1440,12 +1440,12 @@ Notes:
 
 ## `[agents_ipc]`
 
-Inter-process communication for independent ZeroClaw agents on the same host.
+Inter-process communication for independent LabaClaw agents on the same host.
 
 | Key | Default | Purpose |
 |---|---|---|
 | `enabled` | `false` | Enable IPC tools (`agents_list`, `agents_send`, `agents_inbox`, `state_get`, `state_set`) |
-| `db_path` | `~/.zeroclaw/agents.db` | Shared SQLite database path (all agents on this host share one file) |
+| `db_path` | `~/.labaclaw/agents.db` | Shared SQLite database path (all agents on this host share one file) |
 | `staleness_secs` | `300` | Agents not seen within this window are considered offline (seconds) |
 
 Notes:
@@ -1459,7 +1459,7 @@ Example:
 ```toml
 [agents_ipc]
 enabled = true
-db_path = "~/.zeroclaw/agents.db"
+db_path = "~/.labaclaw/agents.db"
 staleness_secs = 300
 ```
 
@@ -1474,10 +1474,10 @@ staleness_secs = 300
 After editing config:
 
 ```bash
-zeroclaw status
-zeroclaw doctor
-zeroclaw channel doctor
-zeroclaw service restart
+labaclaw status
+labaclaw doctor
+labaclaw channel doctor
+labaclaw service restart
 ```
 
 ## Related Docs

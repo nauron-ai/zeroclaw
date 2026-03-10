@@ -1,57 +1,27 @@
-# ZeroClaw Documentation Inventory
+# LabaClaw Documentation Inventory
 
-This inventory classifies documentation by intent and canonical location.
+This inventory classifies maintained documentation by intent and canonical location.
 
-Last reviewed: **March 1, 2026**.
+Last reviewed: **March 10, 2026**.
 
 ## Classification Legend
 
-- **Current Guide/Reference**: intended to match current runtime behavior
+- **Current Guide/Reference**: intended to describe the target LabaClaw operator surface
 - **Policy/Process**: contribution or governance contract
 - **Proposal/Roadmap**: exploratory or planned behavior
-- **Snapshot/Audit**: time-bound status and gap analysis
-- **Compatibility Shim**: path preserved for backward navigation
+- **Snapshot/Audit**: time-bound status, RFI, or audit history
 
 ## Entry Points
-
-### Product root
 
 | Doc | Type | Audience |
 |---|---|---|
 | `README.md` | Current Guide | all readers |
-| `docs/i18n/zh-CN/README.md` | Current Guide (localized) | Chinese readers |
-| `docs/i18n/ja/README.md` | Current Guide (localized) | Japanese readers |
-| `docs/i18n/ru/README.md` | Current Guide (localized) | Russian readers |
-| `docs/i18n/fr/README.md` | Current Guide (localized) | French readers |
-| `docs/i18n/vi/README.md` | Current Guide (localized) | Vietnamese readers |
-| `docs/i18n/el/README.md` | Current Guide (localized) | Greek readers |
-
-### Docs system
-
-| Doc | Type | Audience |
-|---|---|---|
 | `docs/README.md` | Current Guide (hub) | all readers |
-| `docs/SUMMARY.md` | Current Guide (unified TOC) | all readers |
+| `docs/SUMMARY.md` | Current Guide (TOC) | all readers |
 | `docs/structure/README.md` | Current Guide (structure map) | maintainers |
 | `docs/structure/by-function.md` | Current Guide (function map) | maintainers/operators |
-| `docs/i18n-guide.md` | Current Guide (i18n completion contract) | contributors/agents |
-| `docs/i18n/README.md` | Current Guide (locale index) | maintainers/translators |
-| `docs/i18n-coverage.md` | Current Guide (coverage matrix) | maintainers/translators |
 
-## Locale Hubs (Canonical)
-
-| Locale | Canonical hub | Type |
-|---|---|---|
-| `zh-CN` | `docs/i18n/zh-CN/README.md` | Current Guide (localized hub scaffold) |
-| `ja` | `docs/i18n/ja/README.md` | Current Guide (localized hub scaffold) |
-| `ru` | `docs/i18n/ru/README.md` | Current Guide (localized hub scaffold) |
-| `fr` | `docs/i18n/fr/README.md` | Current Guide (localized hub scaffold) |
-| `vi` | `docs/i18n/vi/README.md` | Current Guide (full localized tree) |
-| `el` | `docs/i18n/el/README.md` | Current Guide (full localized tree) |
-
-Compatibility shims such as `docs/SUMMARY.<locale>.md` and `docs/vi/**` remain valid but are non-canonical.
-
-## Collection Index Docs (English canonical)
+## Collection Index Docs
 
 | Doc | Type | Audience |
 |---|---|---|
@@ -61,10 +31,11 @@ Compatibility shims such as `docs/SUMMARY.<locale>.md` and `docs/vi/**` remain v
 | `docs/security/README.md` | Current Guide | operators/contributors |
 | `docs/hardware/README.md` | Current Guide | hardware builders |
 | `docs/contributing/README.md` | Current Guide | contributors/reviewers |
-| `docs/project/README.md` | Current Guide | maintainers |
 | `docs/sop/README.md` | Current Guide | operators/automation maintainers |
 
-## Current Guides & References
+Historical snapshots are retained below as archive material. Active project tracking is no longer part of the main docs navigation.
+
+## Current Guides And References
 
 | Doc | Type | Audience |
 |---|---|---|
@@ -84,6 +55,7 @@ Compatibility shims such as `docs/SUMMARY.<locale>.md` and `docs/vi/**` remain v
 | `docs/network-deployment.md` | Current Guide | operators |
 | `docs/mattermost-setup.md` | Current Guide | operators |
 | `docs/nextcloud-talk-setup.md` | Current Guide | operators |
+| `docs/migration/openclaw-migration-guide.md` | Current Migration Guide | adopters/integrators |
 | `docs/cargo-slicer-speedup.md` | Current Build/CI Guide | maintainers |
 | `docs/adding-boards-and-tools.md` | Current Guide | hardware builders |
 | `docs/arduino-uno-q-setup.md` | Current Guide | hardware builders |
@@ -96,7 +68,7 @@ Compatibility shims such as `docs/SUMMARY.<locale>.md` and `docs/vi/**` remain v
 | `docs/audit-event-schema.md` | Current CI/Security Reference | maintainers/security reviewers |
 | `docs/security/official-channels-and-fraud-prevention.md` | Current Security Guide | users/operators |
 
-## Policy / Process Docs
+## Policy And Process Docs
 
 | Doc | Type |
 |---|---|
@@ -104,10 +76,13 @@ Compatibility shims such as `docs/SUMMARY.<locale>.md` and `docs/vi/**` remain v
 | `docs/reviewer-playbook.md` | Process |
 | `docs/ci-map.md` | Process |
 | `docs/actions-source-policy.md` | Policy |
+| `CONTRIBUTING.md` | Process |
+| `AGENTS.md` | Process |
+| `CLAUDE.md` | Process |
 
-## Proposal / Roadmap Docs
+## Proposal And Roadmap Docs
 
-These are valuable context, but **not strict runtime contracts**.
+These are useful context, but not strict runtime contracts.
 
 | Doc | Type |
 |---|---|
@@ -118,21 +93,21 @@ These are valuable context, but **not strict runtime contracts**.
 | `docs/frictionless-security.md` | Proposal |
 | `docs/security-roadmap.md` | Roadmap |
 
-## Snapshot / Audit Docs
+## Snapshot And Audit Docs
 
 | Doc | Type |
 |---|---|
+| `docs/project/README.md` | Archive Index |
 | `docs/project-triage-snapshot-2026-02-18.md` | Snapshot |
-| `docs/docs-audit-2026-02-24.md` | Snapshot (docs architecture audit) |
-| `docs/project/m4-5-rfi-spike-2026-02-28.md` | Snapshot (M4-5 workspace split RFI baseline and execution plan) |
-| `docs/project/f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md` | Snapshot (F1-3 lifecycle state machine RFI) |
-| `docs/project/q0-3-stop-reason-state-machine-rfi-2026-03-01.md` | Snapshot (Q0-3 stop-reason/continuation RFI) |
-| `docs/i18n-gap-backlog.md` | Snapshot (i18n depth gap tracking) |
+| `docs/docs-audit-2026-02-24.md` | Snapshot |
+| `docs/project/m4-5-rfi-spike-2026-02-28.md` | Snapshot |
+| `docs/project/f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md` | Snapshot |
+| `docs/project/q0-3-stop-reason-state-machine-rfi-2026-03-01.md` | Snapshot |
 
 ## Maintenance Contract
 
-1. Update `docs/SUMMARY.md` and nearest category index when adding a major doc.
-2. Keep locale navigation parity across all supported locales (`en`, `zh-CN`, `ja`, `ru`, `fr`, `vi`, `el`).
-3. Use `docs/i18n-guide.md` whenever docs IA/shared wording changes.
-4. Keep canonical localized hubs under `docs/i18n/<locale>/`; treat shim paths as compatibility only.
-5. Keep snapshots date-stamped and immutable; add newer snapshots instead of rewriting historical ones.
+1. Update `docs/SUMMARY.md` and the nearest category index when adding a major doc.
+2. Keep the documentation English-only and use the target LabaClaw surface in user-facing docs.
+3. Limit ZeroClaw mentions to fork provenance, runtime migration status, and upstream sync policy.
+4. Keep snapshots date-stamped and immutable; add newer snapshots instead of rewriting historical ones.
+5. Do not add active project-tracking or Linear workflow surfaces back into the main docs navigation while migration is in flight.

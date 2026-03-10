@@ -1,4 +1,4 @@
-# ZeroClaw Troubleshooting
+# LabaClaw Troubleshooting
 
 This guide focuses on common setup/runtime failures and fast resolution paths.
 
@@ -78,10 +78,10 @@ cargo build --release --locked --features hardware
 
 Symptoms:
 
-- `cargo check` / `cargo build` appears stuck at `Checking zeroclaw` for a long time
+- `cargo check` / `cargo build` appears stuck at `Checking labaclaw` for a long time
 - repeated `Blocking waiting for file lock on package cache` or `build directory`
 
-Why this happens in ZeroClaw:
+Why this happens in LabaClaw:
 
 - Matrix E2EE stack (`matrix-sdk`, `ruma`, `vodozemac`) is large and expensive to type-check.
 - TLS + crypto native build scripts (`aws-lc-sys`, `ring`) add noticeable compile time.
@@ -125,17 +125,17 @@ pgrep -af "cargo (check|build|test)|cargo check|cargo build|cargo test"
 
 Stop unrelated cargo jobs before running your own build.
 
-### `zeroclaw` command not found after install
+### `labaclaw` command not found after install
 
 Symptom:
 
-- install succeeds but shell cannot find `zeroclaw`
+- install succeeds but shell cannot find `labaclaw`
 
 Fix:
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
-which zeroclaw
+which labaclaw
 ```
 
 Persist in your shell profile if needed.
@@ -147,8 +147,8 @@ Persist in your shell profile if needed.
 Symptoms:
 
 - agent repeatedly fails shell calls and stops early
-- shell-based actions fail even though ZeroClaw starts
-- `zeroclaw doctor` reports runtime shell capability unavailable
+- shell-based actions fail even though LabaClaw starts
+- `labaclaw doctor` reports runtime shell capability unavailable
 
 Why this happens:
 
@@ -156,11 +156,11 @@ Why this happens:
 - Some environments do not have `sh` in `PATH`.
 - If both Git Bash and PowerShell are missing/misconfigured, shell tool execution will fail.
 
-What changed in ZeroClaw:
+What changed in LabaClaw:
 
 - Native runtime now resolves shell with Windows fallbacks in this order:
   - `bash` -> `sh` -> `pwsh` -> `powershell` -> `cmd`/`COMSPEC`
-- `zeroclaw doctor` now reports:
+- `labaclaw doctor` now reports:
   - selected native shell (kind + resolved executable path)
   - candidate shell availability on Windows
   - explicit warning when fallback is only `cmd`
@@ -173,7 +173,7 @@ where.exe bash
 where.exe pwsh
 where.exe powershell
 echo $env:COMSPEC
-zeroclaw doctor
+labaclaw doctor
 ```
 
 Fix:
@@ -183,23 +183,23 @@ Fix:
    - PowerShell 7 (`pwsh`)
 2. Confirm the shell executable is available in `PATH`.
 3. Ensure `COMSPEC` is set (normally points to `cmd.exe` on Windows).
-4. Reopen terminal and rerun `zeroclaw doctor`.
+4. Reopen terminal and rerun `labaclaw doctor`.
 
 Notes:
 
 - Running with only `cmd` fallback can work, but compatibility is lower than Git Bash or PowerShell.
-- If you already use WSL2, it can help with Unix-style workflows, but it is not mandatory for ZeroClaw shell tooling.
+- If you already use WSL2, it can help with Unix-style workflows, but it is not mandatory for LabaClaw shell tooling.
 
 ### Gateway unreachable
 
 Checks:
 
 ```bash
-zeroclaw status
-zeroclaw doctor
+labaclaw status
+labaclaw doctor
 ```
 
-Verify `~/.zeroclaw/config.toml`:
+Verify `~/.labaclaw/config.toml`:
 
 - `[gateway].host` (default `127.0.0.1`)
 - `[gateway].port` (default `42617`)
@@ -214,7 +214,7 @@ Checks:
 3. Re-run diagnostics:
 
 ```bash
-zeroclaw doctor
+labaclaw doctor
 ```
 
 ## Channel Issues
@@ -228,14 +228,14 @@ Cause:
 Fix:
 
 - keep only one active runtime for that token
-- stop extra `zeroclaw daemon` / `zeroclaw channel start` processes
+- stop extra `labaclaw daemon` / `labaclaw channel start` processes
 
 ### Channel unhealthy in `channel doctor`
 
 Checks:
 
 ```bash
-zeroclaw channel doctor
+labaclaw channel doctor
 ```
 
 Then verify channel-specific credentials + allowlist fields in config.
@@ -338,20 +338,20 @@ Security notes:
 Checks:
 
 ```bash
-zeroclaw service status
+labaclaw service status
 ```
 
 Recovery:
 
 ```bash
-zeroclaw service stop
-zeroclaw service start
+labaclaw service stop
+labaclaw service start
 ```
 
 Linux logs:
 
 ```bash
-journalctl --user -u zeroclaw.service -f
+journalctl --user -u labaclaw.service -f
 ```
 
 ## macOS Catalina (10.15) Compatibility
@@ -403,8 +403,8 @@ The `.cargo/config.toml` in this repository already pins `x86_64-apple-darwin` b
 Both still work:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/install.sh | bash
-curl -fsSL https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nauron-ai/labaclaw/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/nauron-ai/labaclaw/main/scripts/install.sh | bash
 ```
 
 Root `install.sh` is the canonical remote entrypoint and defaults to TUI onboarding for no-arg interactive sessions.
@@ -415,10 +415,10 @@ Root `install.sh` is the canonical remote entrypoint and defaults to TUI onboard
 Collect and include these outputs when filing an issue:
 
 ```bash
-zeroclaw --version
-zeroclaw status
-zeroclaw doctor
-zeroclaw channel doctor
+labaclaw --version
+labaclaw status
+labaclaw doctor
+labaclaw channel doctor
 ```
 
 Also include OS, install method, and sanitized config snippets (no secrets).

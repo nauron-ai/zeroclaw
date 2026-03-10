@@ -1,27 +1,27 @@
-# OpenClaw → ZeroClaw Migration Guide
+# OpenClaw → LabaClaw Migration Guide
 
-This guide walks you through migrating an OpenClaw deployment to ZeroClaw. It covers configuration conversion, endpoint changes, and the architectural differences you need to know.
+This guide walks you through migrating an OpenClaw deployment to LabaClaw. It covers configuration conversion, endpoint changes, and the architectural differences you need to know.
 
 ## Quick Start (Built-in Merge Migration)
 
-ZeroClaw now includes a built-in OpenClaw migration flow:
+LabaClaw now includes a built-in OpenClaw migration flow:
 
 ```bash
 # Preview migration report (no writes)
-zeroclaw migrate openclaw --dry-run
+labaclaw migrate openclaw --dry-run
 
 # Apply merge migration (memory + config + agents)
-zeroclaw migrate openclaw
+labaclaw migrate openclaw
 
 # Optional: run migration during onboarding
-zeroclaw onboard --migrate-openclaw
+labaclaw onboard --migrate-openclaw
 ```
 
-Localization status: this guide currently ships in English only. Localized follow-through for `zh-CN`, `ja`, `ru`, `fr`, `vi`, and `el` is deferred; translators should carry over the exact CLI forms `zeroclaw migrate openclaw` and `zeroclaw onboard --migrate-openclaw` first.
+Localization status: this guide currently ships in English only. Localized follow-through for `zh-CN`, `ja`, `ru`, `fr`, `vi`, and `el` is deferred; translators should carry over the exact CLI forms `labaclaw migrate openclaw` and `labaclaw onboard --migrate-openclaw` first.
 
 Default migration semantics are **merge-first**:
 
-- Existing ZeroClaw values are preserved (no blind overwrite).
+- Existing LabaClaw values are preserved (no blind overwrite).
 - Missing provider/model/channel/agent fields are filled from OpenClaw.
 - List-like fields (for example agent tools / allowlists) are union-merged with de-duplication.
 - Memory import skips duplicate content to reduce noise while keeping existing data.
@@ -32,7 +32,7 @@ Default migration semantics are **merge-first**:
 # 1. Convert your OpenClaw config
 python scripts/convert-openclaw-config.py ~/.openclaw/openclaw.json -o config.toml
 
-# 2. The compatibility layer is built into ZeroClaw — no files to copy.
+# 2. The compatibility layer is built into LabaClaw — no files to copy.
 #    The endpoints are implemented in src/gateway/openclaw_compat.rs and
 #    are already wired into the router in src/gateway/mod.rs.
 
@@ -46,7 +46,7 @@ cargo build --release
 
 OpenClaw was designed as an **OpenAI-compatible API server**. You called it like a remote LLM — send `messages[]`, get a completion back. The gateway was essentially a proxy that added system prompts and tool capabilities.
 
-ZeroClaw is a **standalone messaging gateway**. It owns the full agent loop internally. Channels (WhatsApp, Linq, Nextcloud Talk) send a single message string, and ZeroClaw handles everything: system prompt construction, tool invocation, memory recall, context enrichment, and response generation.
+LabaClaw is a **standalone messaging gateway**. It owns the full agent loop internally. Channels (WhatsApp, Linq, Nextcloud Talk) send a single message string, and LabaClaw handles everything: system prompt construction, tool invocation, memory recall, context enrichment, and response generation.
 
 This means there's no built-in `/v1/chat/completions` endpoint that runs the full agent loop. The one that exists in `openai_compat.rs` uses a simpler chat path without tools or memory.
 
@@ -56,7 +56,7 @@ Two new endpoints that bridge the gap:
 
 | Endpoint | Format | Agent Loop | Use Case |
 |----------|--------|------------|----------|
-| `POST /api/chat` | ZeroClaw-native JSON | Full (with tools + memory) | **Recommended** for new integrations |
+| `POST /api/chat` | LabaClaw-native JSON | Full (with tools + memory) | **Recommended** for new integrations |
 | `POST /v1/chat/completions` | OpenAI-compatible | Full (with tools + memory) | **Drop-in compat** for existing callers |
 
 Both endpoints route through `run_gateway_chat_with_tools` → `agent::process_message`, which is the same code path used by Linq, WhatsApp, and all native channels.
@@ -67,7 +67,7 @@ Both endpoints route through `run_gateway_chat_with_tools` → `agent::process_m
 
 ### POST /api/chat (Recommended)
 
-The clean, ZeroClaw-native endpoint.
+The clean, LabaClaw-native endpoint.
 
 **Request:**
 ```json
@@ -139,7 +139,7 @@ Drop-in replacement for OpenAI-compatible callers. Accepts standard OpenAI forma
 
 ### Provider & Model
 
-| OpenClaw (JSON) | ZeroClaw (TOML) |
+| OpenClaw (JSON) | LabaClaw (TOML) |
 |-----------------|-----------------|
 | `agent.model = "anthropic/claude-opus-4-6"` | `default_provider = "anthropic"` + `default_model = "claude-opus-4-6"` |
 | `agent.model = "openai/gpt-4o"` | `default_provider = "openai"` + `default_model = "gpt-4o"` |
@@ -153,7 +153,7 @@ default_model = "us.anthropic.claude-sonnet-4-6"
 
 ### Gateway
 
-| OpenClaw | ZeroClaw |
+| OpenClaw | LabaClaw |
 |----------|----------|
 | `gateway.port = 18789` | `[gateway]` `port = 42617` |
 | `gateway.bind = "127.0.0.1"` | `[gateway]` `host = "127.0.0.1"` |
@@ -161,7 +161,7 @@ default_model = "us.anthropic.claude-sonnet-4-6"
 
 ### Memory
 
-OpenClaw stores state in `~/.openclaw/`. ZeroClaw uses configurable backends:
+OpenClaw stores state in `~/.openclaw/`. LabaClaw uses configurable backends:
 
 ```toml
 [memory]
@@ -176,11 +176,11 @@ keyword_weight = 0.3            # weight for BM25 keyword search
 Rollout guidance: keep `backend = "sqlite"` as default, then opt into
 `postgres_qdrant_hybrid` only after both `[storage.provider.config].db_url` and
 `[memory.qdrant].url` are configured. Rollback is config-only: switch back to
-`postgres` or `sqlite` and restart ZeroClaw (no silent migration required).
+`postgres` or `sqlite` and restart LabaClaw (no silent migration required).
 
 ### Channels
 
-| OpenClaw Channel | ZeroClaw Status |
+| OpenClaw Channel | LabaClaw Status |
 |------------------|-----------------|
 | WhatsApp | ✅ Native (`/whatsapp`) |
 | Telegram | ✅ Native (channels_config) |
@@ -196,7 +196,7 @@ Rollout guidance: keep `backend = "sqlite"` as default, then opt into
 | MS Teams | ❌ Use /api/chat bridge |
 | WebChat | ❌ Use /api/chat or /v1/chat/completions |
 
-For unsupported channels, point your existing integration at ZeroClaw's `/api/chat` endpoint instead of OpenClaw's `/v1/chat/completions`.
+For unsupported channels, point your existing integration at LabaClaw's `/api/chat` endpoint instead of OpenClaw's `/v1/chat/completions`.
 
 ---
 
@@ -242,7 +242,7 @@ const reply = data.reply;
 ### After — Option B: Use /v1/chat/completions (Zero Code Changes)
 
 ```typescript
-// Same code as before — just point to ZeroClaw host with gateway token.
+// Same code as before — just point to LabaClaw host with gateway token.
 // The compat shim handles the translation.
 const response = await fetch(`https://${host}/v1/chat/completions`, {
   method: "POST",
@@ -261,7 +261,7 @@ const response = await fetch(`https://${host}/v1/chat/completions`, {
 
 ## Conversation Context: What to Know
 
-ZeroClaw's `process_message` starts fresh on each call. It uses **semantic memory recall** (SQLite hybrid search with embeddings + BM25) to surface relevant past context, not ordered conversation history.
+LabaClaw's `process_message` starts fresh on each call. It uses **semantic memory recall** (SQLite hybrid search with embeddings + BM25) to surface relevant past context, not ordered conversation history.
 
 What this means in practice:
 
@@ -275,7 +275,7 @@ What this means in practice:
 - `/api/chat`: Use the `context` array field
 - `/v1/chat/completions`: The shim automatically extracts the last 10 messages from the `messages[]` array and prepends them as context
 
-For full conversation history support, a follow-up change to ZeroClaw's agent loop would be needed to accept a `messages[]` parameter directly.
+For full conversation history support, a follow-up change to LabaClaw's agent loop would be needed to accept a `messages[]` parameter directly.
 
 ---
 
@@ -286,7 +286,7 @@ For full conversation history support, a follow-up change to ZeroClaw's agent lo
 python scripts/convert-openclaw-config.py ~/.openclaw/openclaw.json
 
 # Specify output path
-python scripts/convert-openclaw-config.py ~/.openclaw/openclaw.json -o ~/.zeroclaw/config.toml
+python scripts/convert-openclaw-config.py ~/.openclaw/openclaw.json -o ~/.labaclaw/config.toml
 
 # Preview without writing
 python scripts/convert-openclaw-config.py ~/.openclaw/openclaw.json --dry-run
@@ -299,7 +299,7 @@ The converter handles: provider/model parsing, gateway settings, memory defaults
 ## Deployment Checklist
 
 - [ ] Run config converter and review output
-- [ ] Set API key: `export ZEROCLAW_API_KEY='...'`
+- [ ] Set API key: `export LABACLAW_API_KEY='...'`
 - [ ] Build: `cargo build --release`
 - [ ] Deploy (Docker or native)
 - [ ] Pair: `curl -X POST http://host:port/pair -H 'X-Pairing-Code: ...'`
@@ -313,7 +313,7 @@ The converter handles: provider/model parsing, gateway settings, memory defaults
 
 ## Troubleshooting
 
-**405 on /v1/chat/completions:** The endpoint isn't registered. Make sure you're running a ZeroClaw build that includes the `openclaw_compat` module (check `src/gateway/mod.rs` for the route registration).
+**405 on /v1/chat/completions:** The endpoint isn't registered. Make sure you're running a LabaClaw build that includes the `openclaw_compat` module (check `src/gateway/mod.rs` for the route registration).
 
 **401 Unauthorized:** Pairing is enabled but you're not sending a valid bearer token. Run the `/pair` flow first.
 

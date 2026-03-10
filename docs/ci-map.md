@@ -14,7 +14,7 @@ Merge-blocking checks should stay small and deterministic. Optional checks are u
     - Purpose: Rust validation (`cargo fmt --all -- --check`, `cargo clippy --locked --all-targets -- -D clippy::correctness`, strict delta lint gate on changed Rust lines, `test`, release build smoke) + docs quality checks when docs change (`markdownlint` blocks only issues on changed lines; link check scans only links added on changed lines)
     - Additional behavior: for Rust-impacting PRs and pushes, `CI Required Gate` requires `quality-gate` + `test-and-build` (no PR build-only bypass)
     - Additional behavior: `quality-gate` and `test-and-build` run in parallel (all depend only on `changes` job) to minimize critical path duration
-    - Additional behavior: rust-cache is shared across all Rust CI jobs via unified `prefix-key` (`zeroclaw-ci-v1`) and `shared-key` (`${{ runner.os }}-rust`) to reduce redundant compilation
+    - Additional behavior: rust-cache is shared across all Rust CI jobs via unified `prefix-key` (`labaclaw-ci-v1`) and `shared-key` (`${{ runner.os }}-rust`) to reduce redundant compilation
     - Additional behavior: flake detection is integrated into the `test` job via single-retry probe; emits `test-flake-probe` artifact when flake is suspected; optional blocking can be enabled with repository variable `CI_BLOCK_ON_FLAKE_SUSPECTED=true`
     - Additional behavior: PRs that change CI/CD-governed paths require an explicit approving review from `@chumyin` (`.github/workflows/**`, `.github/codeql/**`, `.github/connectivity/**`, `.github/release/**`, `.github/security/**`, `.github/actionlint.yaml`, `.github/dependabot.yml`, `scripts/ci/**`, and CI governance docs)
     - Additional behavior: PRs that change root license files (`LICENSE-APACHE`, `LICENSE-MIT`) must be authored by `willsarg`
@@ -65,7 +65,7 @@ Merge-blocking checks should stay small and deterministic. Optional checks are u
     - Purpose: build reproducible Linux x86_64 production binaries on `main` pushes and `v*` tags using Blacksmith runners
     - Canonical build command: `cargo build --release --locked`
     - Quality gates: `cargo fmt --all -- --check`, `cargo clippy --locked --all-targets -- -D warnings`, and `cargo test --locked --verbose` before release build
-    - Artifact output: `zeroclaw-linux-amd64` (`target/release/zeroclaw` + `.sha256`)
+    - Artifact output: `labaclaw-linux-amd64` (`target/release/labaclaw` + `.sha256`)
 - `.github/workflows/pr-label-policy-check.yml` (`Label Policy Sanity`)
     - Purpose: validate shared contributor-tier policy in `.github/label-policy.json` and ensure label workflows consume that policy
 

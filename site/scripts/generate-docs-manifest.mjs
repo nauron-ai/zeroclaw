@@ -12,6 +12,7 @@ const manifestFile = path.join(generatedDir, "docs-manifest.json");
 
 const ROOT_ASSET_PATTERN = /\.(png|jpe?g|gif|webp|svg|avif)$/i;
 const MARKDOWN_PATTERN = /\.(md|mdx)$/i;
+const ROOT_MARKDOWN_FILES = ["README.md", "CONTRIBUTING.md"];
 
 function toPosix(filePath) {
   return filePath.replace(/\\/g, "/");
@@ -23,6 +24,7 @@ function normalizePath(filePath) {
 
 function stripMarkdownSyntax(text) {
   return text
+    .replace(/```[\s\S]*?```/g, " ")
     .replace(/`([^`]+)`/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
@@ -32,35 +34,21 @@ function stripMarkdownSyntax(text) {
     .trim();
 }
 
-function detectLanguage(relativePath) {
-  const rel = normalizePath(relativePath);
-
-  const i18nMatch = /^docs\/i18n\/([^/]+)\//.exec(rel);
-  if (i18nMatch) {
-    return i18nMatch[1];
-  }
-
-  const suffixMatch = /\.(zh-CN|ja|ru|fr|vi|el)\.(md|mdx)$/i.exec(rel);
-  if (suffixMatch) {
-    return suffixMatch[1];
-  }
-
-  return "en";
-}
-
 function detectSection(relativePath) {
   const rel = normalizePath(relativePath);
-
   if (!rel.startsWith("docs/")) {
     return "root";
   }
 
-  const parts = rel.split("/");
-
-  if (parts[1] === "i18n") {
-    return parts[2] ? `i18n/${parts[2]}` : "i18n";
+  if (
+    rel.startsWith("docs/project/") ||
+    rel.startsWith("docs/project-triage-snapshot-") ||
+    rel.startsWith("docs/docs-audit-")
+  ) {
+    return "archive";
   }
 
+  const parts = rel.split("/");
   return parts[1] || "docs";
 }
 
@@ -69,10 +57,6 @@ function detectJourney(relativePath) {
 
   if (!rel.startsWith("docs/")) {
     return "start";
-  }
-
-  if (rel.includes("/i18n/") || rel.startsWith("docs/i18n-")) {
-    return "localize";
   }
 
   if (
@@ -93,7 +77,6 @@ function detectJourney(relativePath) {
     rel.includes("runbook") ||
     rel.includes("release-process") ||
     rel.includes("ci-map") ||
-    rel.includes("stage-gates") ||
     rel.includes("required-check")
   ) {
     return "operate";
@@ -103,8 +86,6 @@ function detectJourney(relativePath) {
     rel.includes("/contributing/") ||
     rel.includes("pr-workflow") ||
     rel.includes("reviewer-playbook") ||
-    rel.includes("project-triage") ||
-    rel.includes("/project/") ||
     rel.includes("doc-template")
   ) {
     return "contribute";
@@ -167,15 +148,11 @@ function detectAudience(relativePath, journey) {
   const rel = normalizePath(relativePath).toLowerCase();
 
   if (journey === "start") return "newcomer";
-  if (journey === "operate") return "operator";
+  if (journey === "operate" || rel.includes("troubleshooting")) return "operator";
   if (journey === "secure") return "security";
-  if (journey === "contribute" || journey === "localize") return "contributor";
+  if (journey === "contribute") return "contributor";
   if (journey === "integrate") return "integrator";
   if (journey === "hardware") return "hardware";
-
-  if (rel.includes("troubleshooting")) {
-    return "operator";
-  }
 
   return "builder";
 }
@@ -196,8 +173,7 @@ function detectKind(relativePath) {
     rel.includes("policy") ||
     rel.includes("roadmap") ||
     rel.includes("release-process") ||
-    rel.includes("required-check-mapping") ||
-    rel.includes("stage-gates")
+    rel.includes("required-check-mapping")
   ) {
     return "policy";
   }
@@ -230,74 +206,16 @@ function detectKind(relativePath) {
 function isStartHere(relativePath, journey) {
   const rel = normalizePath(relativePath).toLowerCase();
 
-  if (journey === "start" && /readme\.md$/.test(rel)) {
-    return true;
-  }
-
   return (
+    journey === "start" ||
     rel === "readme.md" ||
-    rel === "docs/getting-started/readme.md" ||
-    rel === "docs/one-click-bootstrap.md" ||
-    rel === "docs/docker-setup.md" ||
-    rel === "docs/network-deployment.md" ||
+    rel === "docs/readme.md" ||
+    rel === "docs/summary.md" ||
     rel === "docs/commands-reference.md" ||
     rel === "docs/config-reference.md" ||
-    rel === "docs/troubleshooting.md"
+    rel === "docs/network-deployment.md" ||
+    rel === "docs/operations-runbook.md"
   );
-}
-
-function wordCount(markdown) {
-  const plain = stripMarkdownSyntax(markdown)
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`[^`]+`/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  if (!plain) {
-    return 0;
-  }
-
-  return plain.split(" ").filter(Boolean).length;
-}
-
-function estimateReadingMinutes(markdown) {
-  const words = wordCount(markdown);
-  if (words <= 0) {
-    return 1;
-  }
-
-  return Math.max(1, Math.min(35, Math.ceil(words / 220)));
-}
-
-function inferTags(relativePath, title, summary, journey, audience, kind, section) {
-  const rel = normalizePath(relativePath).toLowerCase();
-  const bag = `${rel} ${title} ${summary}`.toLowerCase();
-  const tags = new Set([journey, audience, kind, section]);
-
-  const rules = [
-    { pattern: /(getting-started|one-click-bootstrap|onboard|setup|readme)/, tag: "onboarding" },
-    { pattern: /(docker|network|gateway|deploy|daemon)/, tag: "deployment" },
-    { pattern: /(security|sandbox|advisory|vulnerability|audit)/, tag: "security" },
-    { pattern: /(commands|config|providers|channels|reference|schema)/, tag: "reference" },
-    { pattern: /(operations|runbook|sop|release|ci|workflow|gate)/, tag: "operations" },
-    { pattern: /(langgraph|matrix|mattermost|nextcloud|qwen|glm|custom-provider)/, tag: "integrations" },
-    { pattern: /(hardware|arduino|esp32|nucleo|datasheet)/, tag: "hardware" },
-    { pattern: /(i18n|translation|locale)/, tag: "i18n" },
-    { pattern: /(contributing|reviewer|pull request|pr-workflow|project)/, tag: "contributing" },
-    { pattern: /(troubleshoot|diagnos|doctor|debug)/, tag: "troubleshooting" },
-  ];
-
-  for (const rule of rules) {
-    if (rule.pattern.test(bag)) {
-      tags.add(rule.tag);
-    }
-  }
-
-  return [...tags]
-    .map((tag) => tag.trim())
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b))
-    .slice(0, 8);
 }
 
 function fallbackTitle(relativePath) {
@@ -305,7 +223,7 @@ function fallbackTitle(relativePath) {
 
   if (filename.toLowerCase() === "readme") {
     const parent = path.basename(path.dirname(relativePath));
-    if (parent && parent !== "." && parent !== "docs" && parent !== "i18n") {
+    if (parent && parent !== "." && parent !== "docs") {
       return `${parent} README`;
     }
   }
@@ -320,18 +238,15 @@ function extractTitle(markdown, relativePath) {
   const lines = markdown.split(/\r?\n/);
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    const heading = /^#{1,2}\s+(.+)$/.exec(trimmed);
+    const heading = /^#{1,2}\s+(.+)$/.exec(line.trim());
     if (heading) {
-      const title = stripMarkdownSyntax(heading[1].replace(/\s+#*$/, ""));
-      if (title) return title;
+      return stripMarkdownSyntax(heading[1].replace(/\s+#*$/, "")) || fallbackTitle(relativePath);
     }
   }
 
   const h1Tag = /<h1[^>]*>([\s\S]*?)<\/h1>/i.exec(markdown);
   if (h1Tag) {
-    const title = stripMarkdownSyntax(h1Tag[1]);
-    if (title) return title;
+    return stripMarkdownSyntax(h1Tag[1]) || fallbackTitle(relativePath);
   }
 
   return fallbackTitle(relativePath);
@@ -349,11 +264,9 @@ function extractSummary(markdown) {
       continue;
     }
 
-    if (inCode || !line) {
-      continue;
-    }
-
     if (
+      inCode ||
+      !line ||
       line.startsWith("#") ||
       line.startsWith("|") ||
       line.startsWith("<") ||
@@ -371,6 +284,37 @@ function extractSummary(markdown) {
   }
 
   return "Project documentation.";
+}
+
+function estimateReadingMinutes(markdown) {
+  const words = stripMarkdownSyntax(markdown).split(" ").filter(Boolean).length;
+  return Math.max(1, Math.min(35, Math.ceil(words / 220) || 1));
+}
+
+function inferTags(relativePath, title, summary, journey, audience, kind, section) {
+  const rel = normalizePath(relativePath).toLowerCase();
+  const bag = `${rel} ${title} ${summary}`.toLowerCase();
+  const tags = new Set([journey, audience, kind, section]);
+
+  const rules = [
+    { pattern: /(getting-started|one-click-bootstrap|onboard|setup|readme)/, tag: "onboarding" },
+    { pattern: /(docker|network|gateway|deploy|daemon|mesh)/, tag: "deployment" },
+    { pattern: /(security|sandbox|advisory|vulnerability|audit)/, tag: "security" },
+    { pattern: /(commands|config|providers|channels|reference|schema)/, tag: "reference" },
+    { pattern: /(operations|runbook|sop|release|ci|workflow|gate)/, tag: "operations" },
+    { pattern: /(langgraph|matrix|mattermost|nextcloud|glm|custom-provider)/, tag: "integrations" },
+    { pattern: /(hardware|arduino|esp32|nucleo|datasheet)/, tag: "hardware" },
+    { pattern: /(contributing|reviewer|pull request|project|fork)/, tag: "contributing" },
+    { pattern: /(troubleshoot|diagnos|doctor|debug)/, tag: "troubleshooting" },
+  ];
+
+  for (const rule of rules) {
+    if (rule.pattern.test(bag)) {
+      tags.add(rule.tag);
+    }
+  }
+
+  return [...tags].map((tag) => tag.trim()).filter(Boolean).sort().slice(0, 8);
 }
 
 function toId(relativePath) {
@@ -421,43 +365,40 @@ async function main() {
   await fs.rm(outRoot, { recursive: true, force: true });
   await ensureDir(outRoot);
 
-  const rootEntries = await fs.readdir(repoRoot, { withFileTypes: true });
-  const rootMarkdownFiles = rootEntries
-    .filter((entry) => entry.isFile() && MARKDOWN_PATTERN.test(entry.name))
-    .map((entry) => path.join(repoRoot, entry.name));
+  const docsAllFiles = await walkFiles(docsRoot);
+  const docsMarkdownFiles = docsAllFiles.filter((filePath) => MARKDOWN_PATTERN.test(filePath));
 
+  const rootMarkdownFiles = [];
+  for (const relativePath of ROOT_MARKDOWN_FILES) {
+    const absolutePath = path.join(repoRoot, relativePath);
+    try {
+      await fs.access(absolutePath);
+      rootMarkdownFiles.push(absolutePath);
+    } catch {
+      // skip missing files
+    }
+  }
+
+  const rootEntries = await fs.readdir(repoRoot, { withFileTypes: true });
   const rootAssetFiles = rootEntries
     .filter((entry) => entry.isFile() && ROOT_ASSET_PATTERN.test(entry.name))
     .map((entry) => path.join(repoRoot, entry.name));
 
-  const docsAllFiles = await walkFiles(docsRoot);
-  const markdownDocs = docsAllFiles.filter((filePath) => MARKDOWN_PATTERN.test(filePath));
-
-  for (const filePath of docsAllFiles) {
-    await copyIntoPublic(filePath);
-  }
-
-  for (const filePath of rootMarkdownFiles) {
-    await copyIntoPublic(filePath);
-  }
-
-  for (const filePath of rootAssetFiles) {
+  for (const filePath of [...docsAllFiles, ...rootMarkdownFiles, ...rootAssetFiles]) {
     await copyIntoPublic(filePath);
   }
 
   const manifestEntries = [];
-  const markdownFiles = [...rootMarkdownFiles, ...markdownDocs];
 
-  for (const filePath of markdownFiles) {
+  for (const filePath of [...rootMarkdownFiles, ...docsMarkdownFiles]) {
     const relativePath = normalizePath(path.relative(repoRoot, filePath));
     const content = await fs.readFile(filePath, "utf8");
-    const section = detectSection(relativePath);
     const journey = detectJourney(relativePath);
     const audience = detectAudience(relativePath, journey);
     const kind = detectKind(relativePath);
     const title = extractTitle(content, relativePath);
     const summary = extractSummary(content);
-    const readingMinutes = estimateReadingMinutes(content);
+    const section = detectSection(relativePath);
 
     manifestEntries.push({
       id: toId(relativePath),
@@ -465,23 +406,22 @@ async function main() {
       title,
       summary,
       section,
-      language: detectLanguage(relativePath),
+      language: "en",
       journey,
       audience,
       kind,
       tags: inferTags(relativePath, title, summary, journey, audience, kind, section),
-      readingMinutes,
+      readingMinutes: estimateReadingMinutes(content),
       startHere: isStartHere(relativePath, journey),
-      sourceUrl: `https://github.com/zeroclaw-labs/zeroclaw/blob/main/${relativePath}`,
+      sourceUrl: `https://github.com/nauron-ai/labaclaw/blob/main/${relativePath}`,
     });
   }
 
   manifestEntries.sort((a, b) => a.path.localeCompare(b.path));
-
   await fs.writeFile(manifestFile, JSON.stringify(manifestEntries, null, 2) + "\n", "utf8");
 
   process.stdout.write(
-    `[docs-manifest] generated ${manifestEntries.length} markdown entries and copied docs assets\n`
+    `[docs-manifest] generated ${manifestEntries.length} English markdown entries and copied docs assets\n`
   );
 }
 

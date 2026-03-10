@@ -1,6 +1,6 @@
 # Perplexity Filter (Opt-In)
 
-ZeroClaw provides an opt-in lightweight statistical filter that detects
+LabaClaw provides an opt-in lightweight statistical filter that detects
 adversarial suffixes (for example, GCG-style optimized gibberish tails)
 before messages are sent to an LLM provider.
 

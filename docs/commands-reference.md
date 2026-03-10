@@ -1,6 +1,6 @@
-# ZeroClaw Commands Reference
+# LabaClaw Commands Reference
 
-This reference is derived from the current CLI surface (`zeroclaw --help`).
+This reference is derived from the current CLI surface (`labaclaw --help`).
 
 Last verified: **March 4, 2026**.
 
@@ -15,7 +15,7 @@ Last verified: **March 4, 2026**.
 | `service` | Manage user-level OS service lifecycle |
 | `doctor` | Run diagnostics and freshness checks |
 | `status` | Print current configuration and system summary |
-| `update` | Check or install latest ZeroClaw release |
+| `update` | Check or install latest LabaClaw release |
 | `estop` | Engage/resume emergency stop levels and inspect estop state |
 | `security` | Run security maintenance operations (semantic guard corpus updates) |
 | `cron` | Manage scheduled tasks |
@@ -35,15 +35,15 @@ Last verified: **March 4, 2026**.
 
 ### `onboard`
 
-- `zeroclaw onboard`
-- `zeroclaw onboard --interactive`
-- `zeroclaw onboard --channels-only`
-- `zeroclaw onboard --force`
-- `zeroclaw onboard --api-key <KEY> --provider <ID> --memory <sqlite|lucid|markdown|none>`
-- `zeroclaw onboard --api-key <KEY> --provider <ID> --model <MODEL_ID> --memory <sqlite|lucid|markdown|none>`
-- `zeroclaw onboard --api-key <KEY> --provider <ID> --model <MODEL_ID> --memory <sqlite|lucid|markdown|none> --force`
-- `zeroclaw onboard --migrate-openclaw`
-- `zeroclaw onboard --migrate-openclaw --openclaw-source <PATH> --openclaw-config <PATH>`
+- `labaclaw onboard`
+- `labaclaw onboard --interactive`
+- `labaclaw onboard --channels-only`
+- `labaclaw onboard --force`
+- `labaclaw onboard --api-key <KEY> --provider <ID> --memory <sqlite|lucid|markdown|none>`
+- `labaclaw onboard --api-key <KEY> --provider <ID> --model <MODEL_ID> --memory <sqlite|lucid|markdown|none>`
+- `labaclaw onboard --api-key <KEY> --provider <ID> --model <MODEL_ID> --memory <sqlite|lucid|markdown|none> --force`
+- `labaclaw onboard --migrate-openclaw`
+- `labaclaw onboard --migrate-openclaw --openclaw-source <PATH> --openclaw-config <PATH>`
 
 `onboard` safety behavior:
 
@@ -51,16 +51,16 @@ Last verified: **March 4, 2026**.
   - Full onboarding (overwrite `config.toml`)
   - Provider-only update (update provider/model/API key while preserving existing channels, tunnel, memory, hooks, and other settings)
 - In non-interactive environments, existing `config.toml` causes a safe refusal unless `--force` is passed.
-- Use `zeroclaw onboard --channels-only` when you only need to rotate channel tokens/allowlists.
-- OpenClaw migration mode is merge-first by design: existing ZeroClaw data/config is preserved, missing fields are filled, and list-like values are union-merged with de-duplication.
+- Use `labaclaw onboard --channels-only` when you only need to rotate channel tokens/allowlists.
+- OpenClaw migration mode is merge-first by design: existing LabaClaw data/config is preserved, missing fields are filled, and list-like values are union-merged with de-duplication.
 - Interactive onboarding can auto-detect `~/.openclaw` and prompt for optional merge migration even without `--migrate-openclaw`.
 
 ### `agent`
 
-- `zeroclaw agent`
-- `zeroclaw agent -m "Hello"`
-- `zeroclaw agent --provider <ID> --model <MODEL> --temperature <0.0-2.0>`
-- `zeroclaw agent --peripheral <board:path>`
+- `labaclaw agent`
+- `labaclaw agent -m "Hello"`
+- `labaclaw agent --provider <ID> --model <MODEL> --temperature <0.0-2.0>`
+- `labaclaw agent --peripheral <board:path>`
 
 Tip:
 
@@ -73,23 +73,23 @@ Tip:
 
 ### `gateway` / `daemon`
 
-- `zeroclaw gateway [--host <HOST>] [--port <PORT>] [--new-pairing]`
-- `zeroclaw daemon [--host <HOST>] [--port <PORT>]`
+- `labaclaw gateway [--host <HOST>] [--port <PORT>] [--new-pairing]`
+- `labaclaw daemon [--host <HOST>] [--port <PORT>]`
 
 `--new-pairing` clears all stored paired tokens and forces generation of a fresh pairing code on gateway startup.
 
 ### `estop`
 
-- `zeroclaw estop` (engage `kill-all`)
-- `zeroclaw estop --level network-kill`
-- `zeroclaw estop --level domain-block --domain "*.chase.com" [--domain "*.paypal.com"]`
-- `zeroclaw estop --level tool-freeze --tool shell [--tool browser]`
-- `zeroclaw estop status`
-- `zeroclaw estop resume`
-- `zeroclaw estop resume --network`
-- `zeroclaw estop resume --domain "*.chase.com"`
-- `zeroclaw estop resume --tool shell`
-- `zeroclaw estop resume --otp <123456>`
+- `labaclaw estop` (engage `kill-all`)
+- `labaclaw estop --level network-kill`
+- `labaclaw estop --level domain-block --domain "*.chase.com" [--domain "*.paypal.com"]`
+- `labaclaw estop --level tool-freeze --tool shell [--tool browser]`
+- `labaclaw estop status`
+- `labaclaw estop resume`
+- `labaclaw estop resume --network`
+- `labaclaw estop resume --domain "*.chase.com"`
+- `labaclaw estop resume --tool shell`
+- `labaclaw estop resume --otp <123456>`
 
 Notes:
 
@@ -99,10 +99,10 @@ Notes:
 
 ### `security`
 
-- `zeroclaw security update-guard-corpus`
-- `zeroclaw security update-guard-corpus --source builtin`
-- `zeroclaw security update-guard-corpus --source ./data/security/attack-corpus-v1.jsonl`
-- `zeroclaw security update-guard-corpus --source https://example.com/guard-corpus.jsonl --checksum <sha256>`
+- `labaclaw security update-guard-corpus`
+- `labaclaw security update-guard-corpus --source builtin`
+- `labaclaw security update-guard-corpus --source ./data/security/attack-corpus-v1.jsonl`
+- `labaclaw security update-guard-corpus --source https://example.com/guard-corpus.jsonl --checksum <sha256>`
 
 Notes:
 
@@ -113,35 +113,35 @@ Notes:
 
 ### `service`
 
-- `zeroclaw service install`
-- `zeroclaw service start`
-- `zeroclaw service stop`
-- `zeroclaw service restart`
-- `zeroclaw service status`
-- `zeroclaw service uninstall`
+- `labaclaw service install`
+- `labaclaw service start`
+- `labaclaw service stop`
+- `labaclaw service restart`
+- `labaclaw service status`
+- `labaclaw service uninstall`
 
 ### `update`
 
-- `zeroclaw update --check` (check for new release, no install)
-- `zeroclaw update` (install latest release binary for current platform)
-- `zeroclaw update --force` (reinstall even if current version matches latest)
-- `zeroclaw update --instructions` (print install-method-specific guidance)
+- `labaclaw update --check` (check for new release, no install)
+- `labaclaw update` (install latest release binary for current platform)
+- `labaclaw update --force` (reinstall even if current version matches latest)
+- `labaclaw update --instructions` (print install-method-specific guidance)
 
 Notes:
 
-- If ZeroClaw is installed via Homebrew, prefer `brew upgrade zeroclaw`.
+- If LabaClaw is installed via Homebrew, prefer `brew upgrade labaclaw`.
 - `update --instructions` detects common install methods and prints the safest path.
 
 ### `cron`
 
-- `zeroclaw cron list`
-- `zeroclaw cron add <expr> [--tz <IANA_TZ>] <command>`
-- `zeroclaw cron add-at <rfc3339_timestamp> <command>`
-- `zeroclaw cron add-every <every_ms> <command>`
-- `zeroclaw cron once <delay> <command>`
-- `zeroclaw cron remove <id>`
-- `zeroclaw cron pause <id>`
-- `zeroclaw cron resume <id>`
+- `labaclaw cron list`
+- `labaclaw cron add <expr> [--tz <IANA_TZ>] <command>`
+- `labaclaw cron add-at <rfc3339_timestamp> <command>`
+- `labaclaw cron add-every <every_ms> <command>`
+- `labaclaw cron once <delay> <command>`
+- `labaclaw cron remove <id>`
+- `labaclaw cron pause <id>`
+- `labaclaw cron resume <id>`
 
 Notes:
 
@@ -150,9 +150,9 @@ Notes:
 
 ### `models`
 
-- `zeroclaw models refresh`
-- `zeroclaw models refresh --provider <ID>`
-- `zeroclaw models refresh --force`
+- `labaclaw models refresh`
+- `labaclaw models refresh --provider <ID>`
+- `labaclaw models refresh --force`
 
 `models refresh` currently supports live catalog refresh for provider IDs: `openrouter`, `openai`, `anthropic`, `groq`, `mistral`, `deepseek`, `xai`, `together-ai`, `gemini`, `ollama`, `llamacpp`, `sglang`, `vllm`, `astrai`, `venice`, `fireworks`, `cohere`, `moonshot`, `stepfun`, `glm`, `zai`, `qwen`, `volcengine` (`doubao`/`ark` aliases), `siliconflow`, and `nvidia`.
 
@@ -168,33 +168,33 @@ Runs a Rust integration test (`tests/gemini_model_availability.rs`) that verifie
 
 ### `providers-quota`
 
-- `zeroclaw providers-quota` — show quota status for all configured providers
-- `zeroclaw providers-quota --provider gemini` — show quota for a specific provider
-- `zeroclaw providers-quota --format json` — JSON output for scripting
+- `labaclaw providers-quota` — show quota status for all configured providers
+- `labaclaw providers-quota --provider gemini` — show quota for a specific provider
+- `labaclaw providers-quota --format json` — JSON output for scripting
 
 Displays provider quota usage, rate limits, circuit breaker state, and OAuth profile health.
 
 ### `doctor`
 
-- `zeroclaw doctor`
-- `zeroclaw doctor models [--provider <ID>] [--use-cache]`
-- `zeroclaw doctor traces [--limit <N>] [--event <TYPE>] [--contains <TEXT>]`
-- `zeroclaw doctor traces --id <TRACE_ID>`
+- `labaclaw doctor`
+- `labaclaw doctor models [--provider <ID>] [--use-cache]`
+- `labaclaw doctor traces [--limit <N>] [--event <TYPE>] [--contains <TEXT>]`
+- `labaclaw doctor traces --id <TRACE_ID>`
 
 Provider connectivity matrix CI/local helper:
 
-- `python3 scripts/ci/provider_connectivity_matrix.py --binary target/release-fast/zeroclaw --contract .github/connectivity/probe-contract.json`
+- `python3 scripts/ci/provider_connectivity_matrix.py --binary target/release-fast/labaclaw --contract .github/connectivity/probe-contract.json`
 
 `doctor traces` reads runtime tool/model diagnostics from `observability.runtime_trace_path`.
 
 ### `channel`
 
-- `zeroclaw channel list`
-- `zeroclaw channel start`
-- `zeroclaw channel doctor`
-- `zeroclaw channel bind-telegram <IDENTITY>`
-- `zeroclaw channel add <type> <json>`
-- `zeroclaw channel remove <name>`
+- `labaclaw channel list`
+- `labaclaw channel start`
+- `labaclaw channel doctor`
+- `labaclaw channel bind-telegram <IDENTITY>`
+- `labaclaw channel add <type> <json>`
+- `labaclaw channel remove <name>`
 
 Runtime in-chat commands while channel server is running:
 
@@ -228,7 +228,7 @@ Approval safety behavior:
 - Optional policy gate: `[autonomy].non_cli_approval_approvers` can restrict who may execute approval-management commands.
 
 Startup behavior for multiple channels:
-- `zeroclaw channel start` starts all configured channels in one process.
+- `labaclaw channel start` starts all configured channels in one process.
 - If one channel fails initialization, other channels continue to start.
 - If all configured channels fail initialization, startup exits with an error.
 
@@ -243,14 +243,14 @@ Channel runtime also watches `config.toml` and hot-applies updates to:
 
 ### `integrations`
 
-- `zeroclaw integrations info <name>`
+- `labaclaw integrations info <name>`
 
 ### `skills`
 
-- `zeroclaw skills list`
-- `zeroclaw skills audit <source_or_name>`
-- `zeroclaw skills install <source>`
-- `zeroclaw skills remove <name>`
+- `labaclaw skills list`
+- `labaclaw skills audit <source_or_name>`
+- `labaclaw skills install <source>`
+- `labaclaw skills remove <name>`
 
 `<source>` accepts:
 
@@ -268,13 +268,13 @@ Channel runtime also watches `config.toml` and hot-applies updates to:
 
 ```bash
 # Install by profile URL (slug extracted from last path segment)
-zeroclaw skill install https://clawhub.ai/steipete/summarize
+labaclaw skill install https://clawhub.ai/steipete/summarize
 
 # Install using short prefix
-zeroclaw skill install clawhub:summarize
+labaclaw skill install clawhub:summarize
 
 # Install from a zip already downloaded locally
-zeroclaw skill install ~/Downloads/summarize-1.0.0.zip
+labaclaw skill install ~/Downloads/summarize-1.0.0.zip
 ```
 
 If the ClawhHub API returns 429 (rate limit) or requires authentication, set `clawhub_token` in `[skills]` config (see [config reference](config-reference.md#skills)).
@@ -283,7 +283,7 @@ If the ClawhHub API returns 429 (rate limit) or requires authentication, set `cl
 - If the zip contains `_meta.json` (OpenClaw convention), name/version/author are read from it.
 - A minimal `SKILL.toml` is written automatically if neither `SKILL.toml` nor `SKILL.md` is present in the zip.
 
-Registry packages are installed to `~/.zeroclaw/workspace/skills/<name>/`.
+Registry packages are installed to `~/.labaclaw/workspace/skills/<name>/`.
 
 `skills install` always runs a built-in static security audit before the skill is accepted. The audit blocks:
 - symlinks inside the skill package
@@ -296,7 +296,7 @@ Registry packages are installed to `~/.zeroclaw/workspace/skills/<name>/`.
 Use `skills audit` to manually validate a candidate skill directory (or an installed skill by name) before sharing it.
 
 Workspace symlink policy:
-- Symlinked entries under `~/.zeroclaw/workspace/skills/` are blocked by default.
+- Symlinked entries under `~/.labaclaw/workspace/skills/` are blocked by default.
 - To allow shared local skill directories, set `[skills].trusted_skill_roots` in `config.toml`.
 - A symlinked skill is accepted only when its resolved canonical target is inside one of the trusted roots.
 
@@ -304,22 +304,22 @@ Skill manifests (`SKILL.toml`) support `prompts` and `[[tools]]`; both are injec
 
 ### `migrate`
 
-- `zeroclaw migrate openclaw [--source <path>] [--source-config <path>] [--dry-run] [--no-memory] [--no-config]`
+- `labaclaw migrate openclaw [--source <path>] [--source-config <path>] [--dry-run] [--no-memory] [--no-config]`
 
 `migrate openclaw` behavior:
 
 - Default mode migrates both memory and config/agents with merge-first semantics.
-- Existing ZeroClaw values are preserved; migration does not overwrite existing user content.
+- Existing LabaClaw values are preserved; migration does not overwrite existing user content.
 - Memory migration de-duplicates repeated content during merge while keeping existing entries intact.
 - `--dry-run` prints a migration report without writing data.
 - `--no-memory` or `--no-config` scopes migration to selected modules.
 
 ### `config`
 
-- `zeroclaw config show`
-- `zeroclaw config get <key>`
-- `zeroclaw config set <key> <value>`
-- `zeroclaw config schema`
+- `labaclaw config show`
+- `labaclaw config get <key>`
+- `labaclaw config set <key> <value>`
+- `labaclaw config schema`
 
 `config show` prints the full effective configuration as pretty JSON with secrets masked as `***REDACTED***`. Environment variable overrides are already applied.
 
@@ -331,33 +331,33 @@ Skill manifests (`SKILL.toml`) support `prompts` and `[[tools]]`; both are injec
 
 ### `completions`
 
-- `zeroclaw completions bash`
-- `zeroclaw completions fish`
-- `zeroclaw completions zsh`
-- `zeroclaw completions powershell`
-- `zeroclaw completions elvish`
+- `labaclaw completions bash`
+- `labaclaw completions fish`
+- `labaclaw completions zsh`
+- `labaclaw completions powershell`
+- `labaclaw completions elvish`
 
 `completions` is stdout-only by design so scripts can be sourced directly without log/warning contamination.
 
 ### `hardware`
 
-- `zeroclaw hardware discover`
-- `zeroclaw hardware introspect <path>`
-- `zeroclaw hardware info [--chip <chip_name>]`
+- `labaclaw hardware discover`
+- `labaclaw hardware introspect <path>`
+- `labaclaw hardware info [--chip <chip_name>]`
 
 ### `peripheral`
 
-- `zeroclaw peripheral list`
-- `zeroclaw peripheral add <board> <path>`
-- `zeroclaw peripheral flash [--port <serial_port>]`
-- `zeroclaw peripheral setup-uno-q [--host <ip_or_host>]`
-- `zeroclaw peripheral flash-nucleo`
+- `labaclaw peripheral list`
+- `labaclaw peripheral add <board> <path>`
+- `labaclaw peripheral flash [--port <serial_port>]`
+- `labaclaw peripheral setup-uno-q [--host <ip_or_host>]`
+- `labaclaw peripheral flash-nucleo`
 
 ## Validation Tip
 
 To verify docs against your current binary quickly:
 
 ```bash
-zeroclaw --help
-zeroclaw <command> --help
+labaclaw --help
+labaclaw <command> --help
 ```

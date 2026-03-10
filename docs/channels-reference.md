@@ -1,6 +1,6 @@
 # Channels Reference
 
-This document is the canonical reference for channel configuration in ZeroClaw.
+This document is the canonical reference for channel configuration in LabaClaw.
 
 For encrypted Matrix rooms, also read the dedicated runbook:
 - [Matrix E2EE Guide](./matrix-e2ee-guide.md)
@@ -22,13 +22,13 @@ This is the most common symptom (same class as issue #499). Check these in order
 3. **Token/account mismatch**: token is valid but belongs to another Matrix account.
 4. **E2EE device identity gap**: `whoami` does not return `device_id` and config does not provide one.
 5. **Key sharing/trust gap**: room keys were not shared to the bot device, so encrypted events cannot be decrypted.
-6. **Stale runtime state**: config changed but `zeroclaw daemon` was not restarted.
+6. **Stale runtime state**: config changed but `labaclaw daemon` was not restarted.
 
 ---
 
 ## 1. Configuration Namespace
 
-All channel settings live under `channels_config` in `~/.zeroclaw/config.toml`.
+All channel settings live under `channels_config` in `~/.labaclaw/config.toml`.
 
 ```toml
 [channels_config]
@@ -37,14 +37,14 @@ cli = true
 
 Each channel is enabled by creating its sub-table (for example, `[channels_config.telegram]`).
 
-One ZeroClaw runtime can serve multiple channels at once: if you configure several
-channel sub-tables, `zeroclaw channel start` launches all of them in the same process.
+One LabaClaw runtime can serve multiple channels at once: if you configure several
+channel sub-tables, `labaclaw channel start` launches all of them in the same process.
 Channel startup is best-effort: a single channel init failure is reported and skipped,
 while remaining channels continue running.
 
 ## In-Chat Runtime Commands
 
-When running `zeroclaw channel start` (or daemon mode), runtime commands include:
+When running `labaclaw channel start` (or daemon mode), runtime commands include:
 
 Telegram/Discord sender-scoped model routing:
 - `/models` — show available providers and current selection
@@ -67,7 +67,7 @@ Notes:
 
 - Switching provider or model clears only that sender's in-memory conversation history to avoid cross-model context contamination.
 - `/new` clears the sender's conversation history without changing provider or model selection.
-- Model cache previews come from `zeroclaw models refresh --provider <ID>`.
+- Model cache previews come from `labaclaw models refresh --provider <ID>`.
 - These are runtime chat commands, not CLI subcommands.
 - Natural-language approval intents are supported with strict parsing and policy control:
   - `direct` mode (default): `授权工具 shell` grants immediately.
@@ -83,7 +83,7 @@ Notes:
 
 ## Inbound Image Marker Protocol
 
-ZeroClaw supports multimodal input through inline message markers:
+LabaClaw supports multimodal input through inline message markers:
 
 - Syntax: ``[IMAGE:<source>]``
 - `<source>` can be:
@@ -122,7 +122,7 @@ cargo check --no-default-features --features hardware,channel-matrix
 cargo check --no-default-features --features hardware,channel-lark
 ```
 
-If `[channels_config.matrix]`, `[channels_config.lark]`, or `[channels_config.feishu]` is present but the corresponding feature is not compiled in, `zeroclaw channel list`, `zeroclaw channel doctor`, and `zeroclaw channel start` will report that the channel is intentionally skipped for this build. The same applies to cron delivery: setting `delivery.channel` to a feature-gated channel in a build without that feature will return an error at delivery time. For Matrix cron delivery, only plain rooms are supported; E2EE rooms require listener sessions via `zeroclaw daemon`.
+If `[channels_config.matrix]`, `[channels_config.lark]`, or `[channels_config.feishu]` is present but the corresponding feature is not compiled in, `labaclaw channel list`, `labaclaw channel doctor`, and `labaclaw channel start` will report that the channel is intentionally skipped for this build. The same applies to cron delivery: setting `delivery.channel` to a feature-gated channel in a build without that feature will return an error at delivery time. For Matrix cron delivery, only plain rooms are supported; E2EE rooms require listener sessions via `labaclaw daemon`.
 
 ---
 
@@ -276,7 +276,7 @@ allowed_sender_ids = []            # optional: sender IDs that bypass mention ga
 [channels_config.matrix]
 homeserver = "https://matrix.example.com"
 access_token = "syt_..."
-user_id = "@zeroclaw:matrix.example.com"   # optional, recommended for E2EE
+user_id = "@labaclaw:matrix.example.com"   # optional, recommended for E2EE
 device_id = "DEVICEID123"                  # optional, recommended for E2EE
 room_id = "!room:matrix.example.com"       # or room alias (#ops:matrix.example.com)
 allowed_users = ["*"]
@@ -299,7 +299,7 @@ ignore_stories = true
 
 ### 4.7 WhatsApp
 
-ZeroClaw supports two WhatsApp backends:
+LabaClaw supports two WhatsApp backends:
 
 - **Cloud API mode** (`phone_number_id` + `access_token` + `verify_token`)
 - **WhatsApp Web mode** (`session_path`, requires build flag `--features whatsapp-web`)
@@ -319,7 +319,7 @@ WhatsApp Web mode:
 
 ```toml
 [channels_config.whatsapp]
-session_path = "~/.zeroclaw/state/whatsapp-web/session.db"
+session_path = "~/.labaclaw/state/whatsapp-web/session.db"
 pair_phone = "15551234567"         # optional; omit to use QR flow
 pair_code = ""                     # optional custom pair code
 allowed_numbers = ["*"]
@@ -358,7 +358,7 @@ password = "email-password"
 from_address = "bot@example.com"
 poll_interval_secs = 60
 allowed_senders = ["*"]
-imap_id = { enabled = true, name = "zeroclaw", version = "0.1.7", vendor = "zeroclaw-labs" }
+imap_id = { enabled = true, name = "labaclaw", version = "0.1.7", vendor = "labaclaw-labs" }
 ```
 
 `imap_id` sends RFC 2971 client metadata right after IMAP login. This is required by some providers
@@ -370,9 +370,9 @@ imap_id = { enabled = true, name = "zeroclaw", version = "0.1.7", vendor = "zero
 [channels_config.irc]
 server = "irc.libera.chat"
 port = 6697
-nickname = "zeroclaw-bot"
-username = "zeroclaw"              # optional
-channels = ["#zeroclaw"]
+nickname = "labaclaw-bot"
+username = "labaclaw"              # optional
+channels = ["#labaclaw"]
 allowed_users = ["*"]
 server_password = ""                # optional
 nickserv_password = ""              # optional
@@ -421,7 +421,7 @@ Migration note:
 - Legacy config `[channels_config.lark] use_feishu = true` is still supported for backward compatibility.
 - Prefer `[channels_config.feishu]` for new setups.
 - Inbound `image` messages are converted to multimodal markers (`[IMAGE:data:image/...;base64,...]`).
-- If image download fails, ZeroClaw forwards fallback text instead of silently dropping the message.
+- If image download fails, LabaClaw forwards fallback text instead of silently dropping the message.
 
 ### 4.13 Nostr
 
@@ -440,7 +440,7 @@ via the `SecretStore` when `secrets.encrypt = true` (the default).
 Interactive onboarding support:
 
 ```bash
-zeroclaw onboard --interactive
+labaclaw onboard --interactive
 ```
 
 The wizard now includes dedicated **Lark** and **Feishu** steps with:
@@ -517,7 +517,7 @@ Notes:
 - Inbound webhook endpoint: `POST /nextcloud-talk`.
 - Signature verification uses `X-Nextcloud-Talk-Random` and `X-Nextcloud-Talk-Signature`.
 - If `webhook_secret` is set, invalid signatures are rejected with `401`.
-- `ZEROCLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides config secret.
+- `LABACLAW_NEXTCLOUD_TALK_WEBHOOK_SECRET` overrides config secret.
 - See [nextcloud-talk-setup.md](./nextcloud-talk-setup.md) for a full runbook.
 
 ### 4.18 Linq
@@ -536,7 +536,7 @@ Notes:
 - Inbound webhook endpoint: `POST /linq`.
 - Signature verification uses `X-Webhook-Signature` (HMAC-SHA256) and `X-Webhook-Timestamp`.
 - If `signing_secret` is set, invalid or stale (>300s) signatures are rejected.
-- `ZEROCLAW_LINQ_SIGNING_SECRET` overrides config secret.
+- `LABACLAW_LINQ_SIGNING_SECRET` overrides config secret.
 - `allowed_senders` uses E.164 phone number format (e.g. `+1234567890`).
 
 ### 4.19 iMessage
@@ -566,11 +566,11 @@ Notes:
 - Accepted auth methods:
   - `X-Hub-Signature-256`, `X-Wati-Signature`, or `X-Webhook-Signature` HMAC-SHA256 (`sha256=<hex>` or raw hex)
   - `Authorization: Bearer <webhook_secret>` fallback
-- `ZEROCLAW_WATI_WEBHOOK_SECRET` overrides `webhook_secret` when set.
+- `LABACLAW_WATI_WEBHOOK_SECRET` overrides `webhook_secret` when set.
 
 ### 4.21 ACP
 
-ACP (Agent Client Protocol) enables ZeroClaw to act as a client for OpenCode ACP server,
+ACP (Agent Client Protocol) enables LabaClaw to act as a client for OpenCode ACP server,
 allowing remote control of OpenCode behavior through JSON-RPC 2.0 communication over stdio.
 
 ```toml
@@ -595,8 +595,8 @@ Notes:
 2. Run:
 
 ```bash
-zeroclaw onboard --channels-only
-zeroclaw daemon
+labaclaw onboard --channels-only
+labaclaw daemon
 ```
 
 1. Send a message from an expected sender.
@@ -615,7 +615,7 @@ If a channel appears connected but does not respond:
 4. Confirm transport mode assumptions:
    - polling/websocket channels do not need public inbound HTTP
    - webhook channels do need reachable HTTPS callback
-5. Restart `zeroclaw daemon` after config changes.
+5. Restart `labaclaw daemon` after config changes.
 
 For Matrix encrypted rooms specifically, use:
 - [Matrix E2EE Guide](./matrix-e2ee-guide.md)
@@ -629,13 +629,13 @@ Use this appendix for fast triage. Match log keywords first, then follow the tro
 ### 7.1 Recommended capture command
 
 ```bash
-RUST_LOG=info zeroclaw daemon 2>&1 | tee /tmp/zeroclaw.log
+RUST_LOG=info labaclaw daemon 2>&1 | tee /tmp/labaclaw.log
 ```
 
 Then filter channel/gateway events:
 
 ```bash
-rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|Lark|DingTalk|QQ|iMessage|Nostr|Webhook|Channel|ACP" /tmp/zeroclaw.log
+rg -n "Matrix|Telegram|Discord|Slack|Mattermost|Signal|WhatsApp|Email|IRC|Lark|DingTalk|QQ|iMessage|Nostr|Webhook|Channel|ACP" /tmp/labaclaw.log
 ```
 
 ### 7.2 Keyword table

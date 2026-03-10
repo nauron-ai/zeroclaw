@@ -1,4 +1,4 @@
-# ZeroClaw Docs By Function
+# LabaClaw Docs By Function
 
 This index groups documentation by operational function instead of folder path.
 
@@ -51,15 +51,15 @@ Use this when you know what you need to do, but not where the doc lives.
 ## Contributing And CI
 
 - Contribution collection: [../contributing/README.md](../contributing/README.md)
+- Contributor guide: [../../CONTRIBUTING.md](../../CONTRIBUTING.md)
 - PR workflow: [../pr-workflow.md](../pr-workflow.md)
 - Reviewer playbook: [../reviewer-playbook.md](../reviewer-playbook.md)
 - CI map: [../ci-map.md](../ci-map.md)
 - Actions source policy: [../actions-source-policy.md](../actions-source-policy.md)
 
-## Localization And Information Architecture
+## Docs Governance And Inventory
 
-- i18n index: [../i18n/README.md](../i18n/README.md)
-- i18n coverage map: [../i18n-coverage.md](../i18n-coverage.md)
-- i18n guide: [../i18n-guide.md](../i18n-guide.md)
+- Docs hub: [../README.md](../README.md)
+- Unified summary: [../SUMMARY.md](../SUMMARY.md)
 - Docs inventory: [../docs-inventory.md](../docs-inventory.md)
 - Docs structure map: [README.md](README.md)

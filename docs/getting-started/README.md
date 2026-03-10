@@ -14,19 +14,19 @@ For first-time setup and quick orientation.
 
 | Scenario | Command |
 |----------|---------|
-| I have an API key, want fastest setup | `zeroclaw onboard --api-key sk-... --provider openrouter` |
-| I want guided prompts | `zeroclaw onboard --interactive` |
-| Config exists, just fix channels | `zeroclaw onboard --channels-only` |
-| Config exists, I intentionally want full overwrite | `zeroclaw onboard --force` |
+| I have an API key, want fastest setup | `labaclaw onboard --api-key sk-... --provider openrouter` |
+| I want guided prompts | `labaclaw onboard --interactive` |
+| Config exists, just fix channels | `labaclaw onboard --channels-only` |
+| Config exists, I intentionally want full overwrite | `labaclaw onboard --force` |
 | Using OpenAI Codex subscription auth | See [OpenAI Codex OAuth Quick Setup](#openai-codex-oauth-quick-setup) |
 
 ## Onboarding and Validation
 
-- Quick onboarding: `zeroclaw onboard --api-key "sk-..." --provider openrouter`
-- Interactive onboarding: `zeroclaw onboard --interactive`
+- Quick onboarding: `labaclaw onboard --api-key "sk-..." --provider openrouter`
+- Interactive onboarding: `labaclaw onboard --interactive`
 - Existing config protection: reruns require explicit confirmation (or `--force` in non-interactive flows)
 - Ollama cloud models (`:cloud`) require a remote `api_url` and API key (for example `api_url = "https://ollama.com"`).
-- Validate environment: `zeroclaw status` + `zeroclaw doctor`
+- Validate environment: `labaclaw status` + `labaclaw doctor`
 
 ## OpenAI Codex OAuth Quick Setup
 
@@ -35,13 +35,13 @@ Use this path when you want `openai-codex` with subscription OAuth credentials (
 1. Authenticate:
 
 ```bash
-zeroclaw auth login --provider openai-codex
+labaclaw auth login --provider openai-codex
 ```
 
 2. Verify auth material is loaded:
 
 ```bash
-zeroclaw auth status --provider openai-codex
+labaclaw auth status --provider openai-codex
 ```
 
 3. Set provider/model defaults:
@@ -65,7 +65,7 @@ default_model = "gpt-5.2-codex"
 5. Start chat:
 
 ```bash
-zeroclaw chat
+labaclaw chat
 ```
 
 Notes:

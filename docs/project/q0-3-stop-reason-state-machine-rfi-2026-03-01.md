@@ -1,12 +1,11 @@
 # Q0-3 Stop-Reason State Machine + Max-Tokens Continuation RFI (2026-03-01)
 
 Status: RFI complete, implementation planning ready.
-GitHub issue: [#2309](https://github.com/zeroclaw-labs/zeroclaw/issues/2309)
-Linear: [RMN-257](https://linear.app/zeroclawlabs/issue/RMN-257/rfi-q0-3-stop-reason-state-machine-max-tokens-continuation)
+GitHub issue: [#2309](https://github.com/nauron-ai/labaclaw/issues/2309)
 
 ## Summary
 
-ZeroClaw currently parses text/tool calls and token usage across providers, but it does not carry a
+LabaClaw currently parses text/tool calls and token usage across providers, but it does not carry a
 normalized stop reason into `ChatResponse`, and there is no deterministic continuation loop for
 `max_tokens` truncation. This RFI defines a provider mapping model, a continuation FSM, partial
 tool-call recovery policy, and observability/testing requirements.
@@ -62,7 +61,7 @@ pub struct ChatResponse {
 
 ## Provider Mapping Matrix
 
-This table defines implementation targets for active provider families in ZeroClaw.
+This table defines implementation targets for active provider families in LabaClaw.
 
 | Provider family | Native field | Native values | Normalized |
 |---|---|---|---|

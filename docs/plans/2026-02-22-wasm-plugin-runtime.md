@@ -12,7 +12,7 @@ as fallback. Enforce deny-by-default capability policy with host-side limits and
 modifying-hook ordering.
 
 **Tech Stack:** Rust, Tokio, Wasmtime (component model), WASI Preview 2, WIT, serde, notify,
-existing ZeroClaw traits/factories.
+existing LabaClaw traits/factories.
 
 ---
 
@@ -105,9 +105,9 @@ git commit -m "feat(plugins): scaffold plugin subsystem modules"
 
 **Files:**
 
-- Create: `wit/zeroclaw/hooks/v1/*.wit`
-- Create: `wit/zeroclaw/tools/v1/*.wit`
-- Create: `wit/zeroclaw/providers/v1/*.wit`
+- Create: `wit/labaclaw/hooks/v1/*.wit`
+- Create: `wit/labaclaw/tools/v1/*.wit`
+- Create: `wit/labaclaw/providers/v1/*.wit`
 - Modify: `src/plugins/manifest.rs`
 - Test: `src/plugins/manifest.rs` inline tests
 
@@ -116,7 +116,7 @@ git commit -m "feat(plugins): scaffold plugin subsystem modules"
 ```rust
 #[test]
 fn manifest_rejects_incompatible_wit_major() {
-    let m = PluginManifest { wit_package: "zeroclaw:hooks@2.0.0".into(), ..Default::default() };
+    let m = PluginManifest { wit_package: "labaclaw:hooks@2.0.0".into(), ..Default::default() };
     assert!(validate_manifest(&m).is_err());
 }
 ```

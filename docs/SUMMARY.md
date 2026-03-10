@@ -1,35 +1,18 @@
-# ZeroClaw Docs Summary (Unified TOC)
+# LabaClaw Docs Summary
 
-This file is the canonical table of contents for the documentation system.
+This file is the canonical English table of contents for the documentation system.
 
-Last refreshed: **February 28, 2026**.
+Last refreshed: **March 10, 2026**.
 
-## Language Entry
+## Entry Points
 
-- Docs Structure Map (language/part/function): [structure/README.md](structure/README.md)
-- Docs Map (by function): [structure/by-function.md](structure/by-function.md)
-- English README: [../README.md](../README.md)
-- Chinese README: [docs/i18n/zh-CN/README.md](i18n/zh-CN/README.md)
-- Japanese README: [docs/i18n/ja/README.md](i18n/ja/README.md)
-- Russian README: [docs/i18n/ru/README.md](i18n/ru/README.md)
-- French README: [docs/i18n/fr/README.md](i18n/fr/README.md)
-- Vietnamese README: [docs/i18n/vi/README.md](i18n/vi/README.md)
-- Greek README: [docs/i18n/el/README.md](i18n/el/README.md)
-- English Docs Hub: [README.md](README.md)
-- Chinese Docs Hub: [i18n/zh-CN/README.md](i18n/zh-CN/README.md)
-- Japanese Docs Hub: [i18n/ja/README.md](i18n/ja/README.md)
-- Russian Docs Hub: [i18n/ru/README.md](i18n/ru/README.md)
-- French Docs Hub: [i18n/fr/README.md](i18n/fr/README.md)
-- Vietnamese Docs Hub: [i18n/vi/README.md](i18n/vi/README.md)
-- Greek Docs Hub: [i18n/el/README.md](i18n/el/README.md)
-- i18n Docs Index: [i18n/README.md](i18n/README.md)
-- i18n Coverage Map: [i18n-coverage.md](i18n-coverage.md)
-- i18n Completion Guide: [i18n-guide.md](i18n-guide.md)
-- i18n Gap Backlog: [i18n-gap-backlog.md](i18n-gap-backlog.md)
+- Root overview: [../README.md](../README.md)
+- Docs hub: [README.md](README.md)
+- Docs structure map: [structure/README.md](structure/README.md)
+- Docs by function: [structure/by-function.md](structure/by-function.md)
+- Docs inventory: [docs-inventory.md](docs-inventory.md)
 
-## Collections
-
-### 1) Getting Started
+## Getting Started
 
 - [getting-started/README.md](getting-started/README.md)
 - [getting-started/macos-update-uninstall.md](getting-started/macos-update-uninstall.md)
@@ -37,32 +20,32 @@ Last refreshed: **February 28, 2026**.
 - [docker-setup.md](docker-setup.md)
 - [android-setup.md](android-setup.md)
 
-### 2) Command/Config References & Integrations
+## Commands, Config, And Integrations
 
 - [reference/README.md](reference/README.md)
 - [commands-reference.md](commands-reference.md)
-- [cron-scheduling.md](cron-scheduling.md)
+- [config-reference.md](config-reference.md)
 - [providers-reference.md](providers-reference.md)
 - [channels-reference.md](channels-reference.md)
-- [nextcloud-talk-setup.md](nextcloud-talk-setup.md)
-- [config-reference.md](config-reference.md)
-- [wasm-tools-guide.md](wasm-tools-guide.md)
 - [custom-providers.md](custom-providers.md)
 - [zai-glm-setup.md](zai-glm-setup.md)
 - [langgraph-integration.md](langgraph-integration.md)
+- [matrix-e2ee-guide.md](matrix-e2ee-guide.md)
+- [mattermost-setup.md](mattermost-setup.md)
+- [nextcloud-talk-setup.md](nextcloud-talk-setup.md)
 - [proxy-agent-playbook.md](proxy-agent-playbook.md)
 
-### 3) Operations & Deployment
+## Operations And Deployment
 
 - [operations/README.md](operations/README.md)
 - [operations-runbook.md](operations-runbook.md)
 - [operations/connectivity-probes-runbook.md](operations/connectivity-probes-runbook.md)
 - [release-process.md](release-process.md)
-- [troubleshooting.md](troubleshooting.md)
 - [network-deployment.md](network-deployment.md)
-- [mattermost-setup.md](mattermost-setup.md)
+- [troubleshooting.md](troubleshooting.md)
+- [cron-scheduling.md](cron-scheduling.md)
 
-### 4) Security Design & Proposals
+## Security And Reliability
 
 - [security/README.md](security/README.md)
 - [security/official-channels-and-fraud-prevention.md](security/official-channels-and-fraud-prevention.md)
@@ -74,7 +57,7 @@ Last refreshed: **February 28, 2026**.
 - [audit-event-schema.md](audit-event-schema.md)
 - [security-roadmap.md](security-roadmap.md)
 
-### 5) Hardware & Peripherals
+## Hardware
 
 - [hardware/README.md](hardware/README.md)
 - [hardware/raspberry-pi-zero-w-build.md](hardware/raspberry-pi-zero-w-build.md)
@@ -87,7 +70,7 @@ Last refreshed: **February 28, 2026**.
 - [datasheets/arduino-uno.md](datasheets/arduino-uno.md)
 - [datasheets/esp32.md](datasheets/esp32.md)
 
-### 6) Contribution & CI
+## Contribution, CI, And Process
 
 - [contributing/README.md](contributing/README.md)
 - [../CONTRIBUTING.md](../CONTRIBUTING.md)
@@ -97,22 +80,18 @@ Last refreshed: **February 28, 2026**.
 - [ci-blacksmith.md](ci-blacksmith.md)
 - [actions-source-policy.md](actions-source-policy.md)
 - [cargo-slicer-speedup.md](cargo-slicer-speedup.md)
+- [doc-template.md](doc-template.md)
 
-### 7) SOP Runtime & Procedures
+## SOP And Migration
 
 - [sop/README.md](sop/README.md)
 - [sop/connectivity.md](sop/connectivity.md)
 - [sop/syntax.md](sop/syntax.md)
 - [sop/observability.md](sop/observability.md)
 - [sop/cookbook.md](sop/cookbook.md)
+- [migration/openclaw-migration-guide.md](migration/openclaw-migration-guide.md)
 
-### 8) Project Status & Snapshot
+## Historical Snapshots
 
-- [project/README.md](project/README.md)
 - [project-triage-snapshot-2026-02-18.md](project-triage-snapshot-2026-02-18.md)
 - [docs-audit-2026-02-24.md](docs-audit-2026-02-24.md)
-- [project/m4-5-rfi-spike-2026-02-28.md](project/m4-5-rfi-spike-2026-02-28.md)
-- [project/f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md](project/f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md)
-- [project/q0-3-stop-reason-state-machine-rfi-2026-03-01.md](project/q0-3-stop-reason-state-machine-rfi-2026-03-01.md)
-- [i18n-gap-backlog.md](i18n-gap-backlog.md)
-- [docs-inventory.md](docs-inventory.md)

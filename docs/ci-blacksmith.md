@@ -1,6 +1,6 @@
 # Blacksmith Production Build Pipeline
 
-This document describes the production binary build lane for ZeroClaw on Blacksmith-backed GitHub Actions runners.
+This document describes the production binary build lane for LabaClaw on Blacksmith-backed GitHub Actions runners.
 
 ## Workflow
 
@@ -37,21 +37,21 @@ cargo build --release --locked
 
 ## Artifact Output
 
-- Binary path: `target/release/zeroclaw`
-- Uploaded artifact name: `zeroclaw-linux-amd64`
+- Binary path: `target/release/labaclaw`
+- Uploaded artifact name: `labaclaw-linux-amd64`
 - Uploaded files:
-    - `artifacts/zeroclaw`
-    - `artifacts/zeroclaw.sha256`
+    - `artifacts/labaclaw`
+    - `artifacts/labaclaw.sha256`
 
 ## Re-run and Debug
 
 1. Open Actions run for `Production Release Build`.
 2. Use `Re-run failed jobs` (or full rerun) from the run page.
 3. Inspect step logs in this order: `Rust quality gates` -> `Build production binary (canonical)` -> `Prepare artifact bundle`.
-4. Download `zeroclaw-linux-amd64` from the run artifacts and verify checksum:
+4. Download `labaclaw-linux-amd64` from the run artifacts and verify checksum:
 
 ```bash
-sha256sum -c zeroclaw.sha256
+sha256sum -c labaclaw.sha256
 ```
 
 5. Reproduce locally from repository root with the same command set:

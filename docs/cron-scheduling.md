@@ -1,24 +1,24 @@
 # Cron & Scheduling System
 
-ZeroClaw includes a full-featured job scheduling system for running tasks on a schedule, at specific times, or at regular intervals.
+LabaClaw includes a full-featured job scheduling system for running tasks on a schedule, at specific times, or at regular intervals.
 
 ## Quick Start
 
 ```bash
 # Add a cron job (runs every day at 9 AM)
-zeroclaw cron add '0 9 * * *' 'echo "Good morning!"'
+labaclaw cron add '0 9 * * *' 'echo "Good morning!"'
 
 # Add a one-shot reminder (runs in 30 minutes)
-zeroclaw cron once 30m 'notify-send "Time is up!"'
+labaclaw cron once 30m 'notify-send "Time is up!"'
 
 # Add an interval job (runs every 5 minutes)
-zeroclaw cron add-every 300000 'curl -s http://api.example.com/health'
+labaclaw cron add-every 300000 'curl -s http://api.example.com/health'
 
 # List all jobs
-zeroclaw cron list
+labaclaw cron list
 
 # Remove a job
-zeroclaw cron remove <job-id>
+labaclaw cron remove <job-id>
 ```
 
 ## Schedule Types
@@ -29,13 +29,13 @@ Standard cron expressions with optional timezone support.
 
 ```bash
 # Every weekday at 9 AM Pacific
-zeroclaw cron add '0 9 * * 1-5' --tz 'America/Los_Angeles' 'echo "Work time"'
+labaclaw cron add '0 9 * * 1-5' --tz 'America/Los_Angeles' 'echo "Work time"'
 
 # Every hour
-zeroclaw cron add '0 * * * *' 'echo "Hourly check"'
+labaclaw cron add '0 * * * *' 'echo "Hourly check"'
 
 # Every 15 minutes
-zeroclaw cron add '*/15 * * * *' 'curl http://localhost:8080/ping'
+labaclaw cron add '*/15 * * * *' 'curl http://localhost:8080/ping'
 ```
 
 **Format:** `minute hour day-of-month month day-of-week`
@@ -54,12 +54,12 @@ Run exactly once at a specific time.
 
 ```bash
 # At a specific ISO timestamp
-zeroclaw cron add-at '2026-03-15T14:30:00Z' 'echo "Meeting starts!"'
+labaclaw cron add-at '2026-03-15T14:30:00Z' 'echo "Meeting starts!"'
 
 # Relative delay (human-friendly)
-zeroclaw cron once 2h 'echo "Two hours later"'
-zeroclaw cron once 30m 'echo "Half hour reminder"'
-zeroclaw cron once 1d 'echo "Tomorrow"'
+labaclaw cron once 2h 'echo "Two hours later"'
+labaclaw cron once 30m 'echo "Half hour reminder"'
+labaclaw cron once 1d 'echo "Tomorrow"'
 ```
 
 **Delay units:** `s` (seconds), `m` (minutes), `h` (hours), `d` (days)
@@ -70,10 +70,10 @@ Run repeatedly at a fixed interval.
 
 ```bash
 # Every 5 minutes (300000 ms)
-zeroclaw cron add-every 300000 'echo "Ping"'
+labaclaw cron add-every 300000 'echo "Ping"'
 
 # Every hour (3600000 ms)
-zeroclaw cron add-every 3600000 'curl http://api.example.com/sync'
+labaclaw cron add-every 3600000 'curl http://api.example.com/sync'
 ```
 
 ## Job Types
@@ -83,7 +83,7 @@ zeroclaw cron add-every 3600000 'curl http://api.example.com/sync'
 Execute shell commands directly:
 
 ```bash
-zeroclaw cron add '0 6 * * *' 'backup.sh && notify-send "Backup done"'
+labaclaw cron add '0 6 * * *' 'backup.sh && notify-send "Backup done"'
 ```
 
 ### Agent Jobs
@@ -91,7 +91,7 @@ zeroclaw cron add '0 6 * * *' 'backup.sh && notify-send "Backup done"'
 Send prompts to the AI agent:
 
 ```toml
-# In zeroclaw.toml
+# In labaclaw.toml
 [[cron.jobs]]
 schedule = { kind = "cron", expr = "0 9 * * *", tz = "America/Los_Angeles" }
 job_type = "agent"
@@ -143,19 +143,19 @@ best_effort = true  # Don't fail if delivery fails
 
 | Command | Description |
 |---------|-------------|
-| `zeroclaw cron list` | Show all scheduled jobs |
-| `zeroclaw cron add <expr> <cmd>` | Add cron-expression job |
-| `zeroclaw cron add-at <time> <cmd>` | Add one-shot at time |
-| `zeroclaw cron add-every <ms> <cmd>` | Add interval job |
-| `zeroclaw cron once <delay> <cmd>` | Add one-shot with delay |
-| `zeroclaw cron update <id> [opts]` | Update job settings |
-| `zeroclaw cron remove <id>` | Delete a job |
-| `zeroclaw cron pause <id>` | Pause (disable) job |
-| `zeroclaw cron resume <id>` | Resume (enable) job |
+| `labaclaw cron list` | Show all scheduled jobs |
+| `labaclaw cron add <expr> <cmd>` | Add cron-expression job |
+| `labaclaw cron add-at <time> <cmd>` | Add one-shot at time |
+| `labaclaw cron add-every <ms> <cmd>` | Add interval job |
+| `labaclaw cron once <delay> <cmd>` | Add one-shot with delay |
+| `labaclaw cron update <id> [opts]` | Update job settings |
+| `labaclaw cron remove <id>` | Delete a job |
+| `labaclaw cron pause <id>` | Pause (disable) job |
+| `labaclaw cron resume <id>` | Resume (enable) job |
 
 ## Configuration File
 
-Define jobs in `zeroclaw.toml`:
+Define jobs in `labaclaw.toml`:
 
 ```toml
 [[cron.jobs]]
@@ -204,9 +204,9 @@ Done! I'll remind you to call mom at 4:30 PM.
 
 ## Migration from OpenClaw
 
-ZeroClaw's cron system is compatible with OpenClaw's scheduling:
+LabaClaw's cron system is compatible with OpenClaw's scheduling:
 
-| OpenClaw | ZeroClaw |
+| OpenClaw | LabaClaw |
 |----------|----------|
 | `kind: "cron"` | `kind = "cron"` ✅ |
 | `kind: "every"` | `kind = "every"` ✅ |
@@ -216,7 +216,7 @@ ZeroClaw's cron system is compatible with OpenClaw's scheduling:
 | `payload.kind: "systemEvent"` | `job_type = "agent"` |
 | `payload.kind: "agentTurn"` | `job_type = "agent"` |
 
-**Key difference:** ZeroClaw uses TOML config format, OpenClaw uses JSON.
+**Key difference:** LabaClaw uses TOML config format, OpenClaw uses JSON.
 
 ## Best Practices
 
@@ -229,7 +229,7 @@ ZeroClaw's cron system is compatible with OpenClaw's scheduling:
 ## Troubleshooting
 
 **Job not running?**
-- Check `zeroclaw cron list` - is it enabled?
+- Check `labaclaw cron list` - is it enabled?
 - Verify the cron expression is correct
 - Check timezone settings
 

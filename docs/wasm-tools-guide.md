@@ -1,8 +1,8 @@
 # WASM Tools Guide
 
 This guide covers everything you need to build, install, and use WASM-based tools
-(skills) in ZeroClaw. WASM tools let you extend the agent with custom capabilities
-written in any language that compiles to WebAssembly — without modifying ZeroClaw's
+(skills) in LabaClaw. WASM tools let you extend the agent with custom capabilities
+written in any language that compiles to WebAssembly — without modifying LabaClaw's
 core source code.
 
 ---
@@ -25,7 +25,7 @@ core source code.
    - [From a local path](#61-install-from-a-local-path)
    - [From a git repository](#62-install-from-a-git-repository)
    - [From ZeroMarket registry](#63-install-from-zeromarket-registry)
-7. [How ZeroClaw Loads and Uses the Tool](#7-how-zeroclaw-loads-and-uses-the-tool)
+7. [How LabaClaw Loads and Uses the Tool](#7-how-labaclaw-loads-and-uses-the-tool)
 8. [Directory Layout Reference](#8-directory-layout-reference)
 9. [Configuration (`[wasm]` section)](#9-configuration-wasm-section)
 10. [Security Model](#10-security-model)
@@ -44,7 +44,7 @@ core source code.
 └───────────────────────┬─────────────────────────────────────┘
                         │  WASI stdio protocol
 ┌───────────────────────▼─────────────────────────────────────┐
-│  ZeroClaw WASM engine (wasmtime + WASI)                     │
+│  LabaClaw WASM engine (wasmtime + WASI)                     │
 │                                                             │
 │  • loads tool.wasm + manifest.json from skills/ directory   │
 │  • registers the tool with the agent's tool registry        │
@@ -63,8 +63,8 @@ in [section 2](#32-protocol-stdin--stdout).
 
 | Requirement | Purpose |
 |---|---|
-| ZeroClaw built with `--features wasm-tools` | Enables the WASM runtime |
-| `wasmtime` CLI | Local testing (`zeroclaw skill test`) |
+| LabaClaw built with `--features wasm-tools` | Enables the WASM runtime |
+| `wasmtime` CLI | Local testing (`labaclaw skill test`) |
 | Language-specific toolchain | Building `.wasm` from source |
 
 > Note: Android/Termux builds currently run in stub mode for `wasm-tools`.
@@ -93,13 +93,13 @@ cargo build --release --features wasm-tools
 ### 3.1 Scaffold from template
 
 ```bash
-zeroclaw skill new <name> --template <typescript|rust|go|python>
+labaclaw skill new <name> --template <typescript|rust|go|python>
 ```
 
 Example:
 
 ```bash
-zeroclaw skill new weather_lookup --template rust
+labaclaw skill new weather_lookup --template rust
 ```
 
 This creates a new directory `./weather_lookup/` with all boilerplate files ready
@@ -120,16 +120,16 @@ Supported templates:
 
 Every WASM tool must follow this single contract:
 
-**Input** (written to the tool's stdin by ZeroClaw):
+**Input** (written to the tool's stdin by LabaClaw):
 
 ```json
 { "param1": "value1", "param2": 42 }
 ```
 
 The shape of the input object is whatever you define in `manifest.json` under
-`parameters`. ZeroClaw passes the LLM-provided argument object verbatim.
+`parameters`. LabaClaw passes the LLM-provided argument object verbatim.
 
-**Output** (read from the tool's stdout by ZeroClaw):
+**Output** (read from the tool's stdout by LabaClaw):
 
 ```json
 { "success": true,  "output": "result text shown to LLM", "error": null }
@@ -147,7 +147,7 @@ The shape of the input object is whatever you define in `manifest.json` under
 ### 3.3 manifest.json
 
 Every tool must ship a `manifest.json` alongside `tool.wasm`. This file tells
-ZeroClaw the tool's name, description, and the JSON Schema for its parameters.
+LabaClaw the tool's name, description, and the JSON Schema for its parameters.
 
 ```json
 {
@@ -179,7 +179,7 @@ ZeroClaw the tool's name, description, and the JSON Schema for its parameters.
 | `description` | yes | Human-readable description (shown to LLM for tool selection) |
 | `version` | no | Manifest format version, default `"1"` |
 | `parameters` | yes | JSON Schema for the tool's input parameters |
-| `homepage` | no | Optional URL shown in `zeroclaw skill list` |
+| `homepage` | no | Optional URL shown in `labaclaw skill list` |
 
 The `name` field is the identifier the LLM uses when it decides to call your tool.
 Keep it descriptive and unique.
@@ -386,7 +386,7 @@ if __name__ == "__main__":
 
 ```bash
 pip install componentize-py
-componentize-py -d wit/ -w zeroclaw-skill componentize app -o tool.wasm
+componentize-py -d wit/ -w labaclaw-skill componentize app -o tool.wasm
 ```
 
 ---
@@ -400,7 +400,7 @@ After editing your tool logic, build it into `tool.wasm`:
 | Rust | `cargo build --target wasm32-wasip1 --release && cp target/wasm32-wasip1/release/*.wasm tool.wasm` | `tool.wasm` |
 | TypeScript | `npm run build` | `tool.wasm` |
 | Go | `tinygo build -o tool.wasm -target wasi .` | `tool.wasm` |
-| Python | `componentize-py -d wit/ -w zeroclaw-skill componentize app -o tool.wasm` | `tool.wasm` |
+| Python | `componentize-py -d wit/ -w labaclaw-skill componentize app -o tool.wasm` | `tool.wasm` |
 
 The output must always be named `tool.wasm` at the root of the skill directory.
 
@@ -408,22 +408,22 @@ The output must always be named `tool.wasm` at the root of the skill directory.
 
 ## 5. Testing Locally
 
-Before installing, test the tool directly without starting the full ZeroClaw agent:
+Before installing, test the tool directly without starting the full LabaClaw agent:
 
 ```bash
-zeroclaw skill test . --args '{"city":"Hanoi","units":"metric"}'
+labaclaw skill test . --args '{"city":"Hanoi","units":"metric"}'
 ```
 
 You can also test an installed skill by name:
 
 ```bash
-zeroclaw skill test weather_lookup --args '{"city":"Tokyo"}'
+labaclaw skill test weather_lookup --args '{"city":"Tokyo"}'
 ```
 
 Or test a specific tool inside a multi-tool skill:
 
 ```bash
-zeroclaw skill test . --tool my_tool_name --args '{"city":"Paris"}'
+labaclaw skill test . --tool my_tool_name --args '{"city":"Paris"}'
 ```
 
 Under the hood, `skill test` pipes the JSON args into `wasmtime run tool.wasm` via
@@ -449,46 +449,46 @@ Expected output:
 ### 6.1 Install from a local path
 
 ```bash
-zeroclaw skill install ./weather_lookup
+labaclaw skill install ./weather_lookup
 ```
 
 This copies your skill directory into `<workspace>/skills/weather_lookup/`.
-ZeroClaw will auto-discover it on next startup.
+LabaClaw will auto-discover it on next startup.
 
 ### 6.2 Install from a git repository
 
 ```bash
-zeroclaw skill install https://github.com/yourname/weather_lookup.git
+labaclaw skill install https://github.com/yourname/weather_lookup.git
 ```
 
-ZeroClaw clones the repository into the skills directory and scans for WASM tools.
+LabaClaw clones the repository into the skills directory and scans for WASM tools.
 
 ### 6.3 Install from ZeroMarket registry
 
 ```bash
 # Format: namespace/package-name
-zeroclaw skill install acme/weather-lookup
+labaclaw skill install acme/weather-lookup
 
 # With a specific version
-zeroclaw skill install acme/weather-lookup@0.2.1
+labaclaw skill install acme/weather-lookup@0.2.1
 ```
 
-ZeroClaw fetches the package index from the configured registry URL, then downloads
+LabaClaw fetches the package index from the configured registry URL, then downloads
 `tool.wasm` and `manifest.json` for each tool in the package.
 
 **Verify the install:**
 
 ```bash
-zeroclaw skill list
+labaclaw skill list
 ```
 
 ---
 
-## 7. How ZeroClaw Loads and Uses the Tool
+## 7. How LabaClaw Loads and Uses the Tool
 
 ### 7.1 Startup discovery
 
-Every time the ZeroClaw agent starts, it scans the `skills/` directory and loads
+Every time the LabaClaw agent starts, it scans the `skills/` directory and loads
 all valid WASM tools automatically. No config change or restart command is needed
 after installation.
 
@@ -534,7 +534,7 @@ User:  What is the weather in Hanoi right now?
 
 Agent: [internally, LLM selects tool "weather_lookup" with args {"city":"Hanoi"}]
 
-       ZeroClaw calls weather_lookup WASM tool:
+       LabaClaw calls weather_lookup WASM tool:
          stdin  → {"city":"Hanoi"}
          stdout ← {"success":true,"output":"Weather in Hanoi: sunny 28°C","error":null}
 
@@ -563,7 +563,7 @@ Agent formats output and responds to user
 
 ### 7.5 Error handling
 
-If a tool fails (non-zero exit, invalid JSON, timeout, fuel exhaustion), ZeroClaw
+If a tool fails (non-zero exit, invalid JSON, timeout, fuel exhaustion), LabaClaw
 logs a warning and returns the error to the LLM. The agent continues running —
 a broken plugin never crashes the process.
 
@@ -571,7 +571,7 @@ a broken plugin never crashes the process.
 
 ## 8. Directory Layout Reference
 
-**Installed layout** (created by `zeroclaw skill install`):
+**Installed layout** (created by `labaclaw skill install`):
 
 ```
 skills/
@@ -599,7 +599,7 @@ to installed layout for distribution.
 
 ## 9. Configuration (`[wasm]` section)
 
-Add this section to your `zeroclaw.toml` to tune WASM tool behavior:
+Add this section to your `labaclaw.toml` to tune WASM tool behavior:
 
 ```toml
 [wasm]
@@ -612,7 +612,7 @@ memory_limit_mb = 64
 # CPU fuel budget — roughly one unit per WASM instruction (default: 1_000_000_000)
 fuel_limit = 1_000_000_000
 
-# Registry URL used by `zeroclaw skill install namespace/package`
+# Registry URL used by `labaclaw skill install namespace/package`
 registry_url = "https://registry.zeromarket.dev"
 ```
 
@@ -645,7 +645,7 @@ A malicious or buggy WASM tool cannot:
 - Make network connections
 - Access environment variables
 - Consume unbounded CPU or memory
-- Crash the ZeroClaw process
+- Crash the LabaClaw process
 
 ---
 
@@ -680,7 +680,7 @@ binary crate instead. For Go, use `tinygo build -target wasi` (not `wasm`).
 Your tool exited without writing a JSON result. Check that your `run()` function
 always writes to stdout before returning, including in error paths.
 
-**Tool not appearing in `zeroclaw skill list`**
+**Tool not appearing in `labaclaw skill list`**
 
 - Verify `manifest.json` exists alongside `tool.wasm`
 - Validate the JSON is well-formed: `cat manifest.json | python3 -m json.tool`

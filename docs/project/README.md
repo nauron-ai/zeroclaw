@@ -1,8 +1,8 @@
-# Project Snapshot & Triage Docs
+# Historical Snapshot Archive
 
-Time-bound project status snapshots for planning documentation and operations work.
+This directory is an archive for dated RFIs and planning snapshots carried forward during the LabaClaw fork transition.
 
-## Current Snapshot
+## Archive Contents
 
 - [../project-triage-snapshot-2026-02-18.md](../project-triage-snapshot-2026-02-18.md)
 - [../docs-audit-2026-02-24.md](../docs-audit-2026-02-24.md)
@@ -10,12 +10,8 @@ Time-bound project status snapshots for planning documentation and operations wo
 - [f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md](f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md)
 - [q0-3-stop-reason-state-machine-rfi-2026-03-01.md](q0-3-stop-reason-state-machine-rfi-2026-03-01.md)
 
-## Scope
+## Usage
 
-Project snapshots are time-bound assessments of open PRs, issues, and documentation health. Use these to:
-
-- Identify documentation gaps driven by feature work
-- Prioritize docs maintenance alongside code changes
-- Track evolving PR/issue pressure over time
-
-For stable documentation classification (not time-bound), use [docs-inventory.md](../docs-inventory.md).
+- Treat these files as historical reference, not as the active project-tracking surface.
+- Do not add new Linear references or project-management links here.
+- Prefer the main docs hub and inventory for current operator and contributor guidance.

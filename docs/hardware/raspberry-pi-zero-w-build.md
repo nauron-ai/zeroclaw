@@ -1,6 +1,6 @@
-# Building ZeroClaw on Raspberry Pi Zero W
+# Building LabaClaw on Raspberry Pi Zero W
 
-Complete guide to compile ZeroClaw on Raspberry Pi Zero W (512MB RAM, ARMv6).
+Complete guide to compile LabaClaw on Raspberry Pi Zero W (512MB RAM, ARMv6).
 
 Last verified: **February 28, 2026**.
 
@@ -35,7 +35,7 @@ When building for Raspberry Pi Zero W, you have two target ABI choices:
 
 **Trade-offs:**
 - musleabihf builds may take slightly longer to compile
-- Some niche dependencies may not support musl (ZeroClaw's dependencies are musl-compatible)
+- Some niche dependencies may not support musl (LabaClaw's dependencies are musl-compatible)
 
 ## Option A: Native Compilation
 
@@ -105,17 +105,17 @@ sudo apt install -y \
     curl
 ```
 
-### Step 5: Clone ZeroClaw Repository
+### Step 5: Clone LabaClaw Repository
 
 ```bash
-git clone https://github.com/zeroclaw-labs/zeroclaw.git
-cd zeroclaw
+git clone https://github.com/nauron-ai/labaclaw.git
+cd labaclaw
 ```
 
 Or if you already have the repository:
 
 ```bash
-cd /path/to/zeroclaw
+cd /path/to/labaclaw
 git fetch --all
 git checkout main
 git pull
@@ -123,14 +123,14 @@ git pull
 
 ### Step 6: Configure Build for Low Memory
 
-ZeroClaw's `Cargo.toml` is already configured for low-memory devices (`codegen-units = 1` in release profile). For additional safety on Pi Zero W:
+LabaClaw's `Cargo.toml` is already configured for low-memory devices (`codegen-units = 1` in release profile). For additional safety on Pi Zero W:
 
 ```bash
 # Set CARGO_BUILD_JOBS=1 to prevent memory exhaustion
 export CARGO_BUILD_JOBS=1
 ```
 
-### Step 7: Choose Target ABI and Build ZeroClaw
+### Step 7: Choose Target ABI and Build LabaClaw
 
 This step will take **30-60 minutes** depending on your storage speed and chosen target.
 
@@ -170,20 +170,20 @@ sudo swapon /swapfile
 
 Then retry the build.
 
-### Step 8: Install ZeroClaw
+### Step 8: Install LabaClaw
 
 ```bash
 # For gnueabihf (default target)
-sudo cp target/release/zeroclaw /usr/local/bin/
+sudo cp target/release/labaclaw /usr/local/bin/
 
 # For musleabihf
-sudo cp target/armv6l-unknown-linux-musleabihf/release/zeroclaw /usr/local/bin/
+sudo cp target/armv6l-unknown-linux-musleabihf/release/labaclaw /usr/local/bin/
 
 # Verify installation
-zeroclaw --version
+labaclaw --version
 
 # Verify binary is statically linked (musleabihf only)
-file /usr/local/bin/zeroclaw
+file /usr/local/bin/labaclaw
 # Should show "statically linked" for musleabihf
 ```
 
@@ -231,12 +231,12 @@ brew install musl-cross
 
 ### Build for musleabihf (Recommended)
 
-The ZeroClaw repository includes pre-configured `.cargo/config.toml` and `.cargo/armv6l-unknown-linux-musleabihf.json` for static linking.
+The LabaClaw repository includes pre-configured `.cargo/config.toml` and `.cargo/armv6l-unknown-linux-musleabihf.json` for static linking.
 
 ```bash
-# Clone ZeroClaw repository
-git clone https://github.com/zeroclaw-labs/zeroclaw.git
-cd zeroclaw
+# Clone LabaClaw repository
+git clone https://github.com/nauron-ai/labaclaw.git
+cd labaclaw
 
 # Add ARMv6 musl target to rustup
 rustup target add armv6l-unknown-linux-musleabihf
@@ -269,10 +269,10 @@ The `rustflags = ["-C", "link-arg=-static"]` flag ensures **fully static linking
 After building, confirm the binary is statically linked:
 
 ```bash
-file target/armv6l-unknown-linux-musleabihf/release/zeroclaw
+file target/armv6l-unknown-linux-musleabihf/release/labaclaw
 # Output should include: "statically linked"
 
-ldd target/armv6l-unknown-linux-musleabihf/release/zeroclaw
+ldd target/armv6l-unknown-linux-musleabihf/release/labaclaw
 # Output should be: "not a dynamic executable"
 ```
 
@@ -309,15 +309,15 @@ cargo build --profile dist --target armv6l-unknown-linux-musleabihf
 
 ```bash
 # From build machine (adjust target as needed)
-scp target/armv6l-unknown-linux-musleabihf/release/zeroclaw pi@zero-w-ip:/home/pi/
+scp target/armv6l-unknown-linux-musleabihf/release/labaclaw pi@zero-w-ip:/home/pi/
 
 # On Pi Zero W
-sudo mv ~/zeroclaw /usr/local/bin/
-sudo chmod +x /usr/local/bin/zeroclaw
-zeroclaw --version
+sudo mv ~/labaclaw /usr/local/bin/
+sudo chmod +x /usr/local/bin/labaclaw
+labaclaw --version
 
 # Verify it's statically linked (no dependencies on target system)
-ldd /usr/local/bin/zeroclaw
+ldd /usr/local/bin/labaclaw
 # Should output: "not a dynamic executable"
 ```
 
@@ -325,7 +325,7 @@ ldd /usr/local/bin/zeroclaw
 
 ```
 ┌─────────────────┐     Clone/Fork     ┌─────────────────────┐
-│  ZeroClaw Repo  │ ──────────────────> │   Your Build Host   │
+│  LabaClaw Repo  │ ──────────────────> │   Your Build Host   │
 │  (GitHub)       │                    │  (Linux/macOS/Win)  │
 └─────────────────┘                    └─────────────────────┘
                                                 │
@@ -348,15 +348,15 @@ ldd /usr/local/bin/zeroclaw
 
 ## Post-Installation Configuration
 
-### Initialize ZeroClaw
+### Initialize LabaClaw
 
 ```bash
 # Run interactive setup
-zeroclaw setup
+labaclaw setup
 
 # Or configure manually
-mkdir -p ~/.config/zeroclaw
-nano ~/.config/zeroclaw/config.toml
+mkdir -p ~/.config/labaclaw
+nano ~/.config/labaclaw/config.toml
 ```
 
 ### Enable Hardware Features (Optional)
@@ -373,21 +373,21 @@ cargo build --release --features peripheral-rpi
 Create a systemd service:
 
 ```bash
-sudo nano /etc/systemd/system/zeroclaw.service
+sudo nano /etc/systemd/system/labaclaw.service
 ```
 
 Add the following:
 
 ```ini
 [Unit]
-Description=ZeroClaw AI Agent
+Description=LabaClaw AI Agent
 After=network.target
 
 [Service]
 Type=simple
 User=pi
 WorkingDirectory=/home/pi
-ExecStart=/usr/local/bin/zeroclaw agent
+ExecStart=/usr/local/bin/labaclaw agent
 Restart=on-failure
 
 [Install]
@@ -398,8 +398,8 @@ Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable zeroclaw
-sudo systemctl start zeroclaw
+sudo systemctl enable labaclaw
+sudo systemctl start labaclaw
 ```
 
 ## Troubleshooting

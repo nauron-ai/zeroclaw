@@ -22,7 +22,7 @@ Use this when CI jobs remain queued, runner availability drops, or runner hosts 
 
 ```bash
 python3 scripts/ci/runner_health_report.py \
-  --repo zeroclaw-labs/zeroclaw \
+  --repo nauron-ai/labaclaw \
   --require-label self-hosted \
   --require-label aws-india \
   --min-online 3 \
@@ -103,7 +103,7 @@ Dry-run example:
 
 ```bash
 python3 scripts/ci/queue_hygiene.py \
-  --repo zeroclaw-labs/zeroclaw \
+  --repo nauron-ai/labaclaw \
   --obsolete-workflow "CI Build (Fast)" \
   --dedupe-workflow "CI Run" \
   --output-json artifacts/queue-hygiene.json
@@ -113,7 +113,7 @@ Apply mode:
 
 ```bash
 python3 scripts/ci/queue_hygiene.py \
-  --repo zeroclaw-labs/zeroclaw \
+  --repo nauron-ai/labaclaw \
   --obsolete-workflow "CI Build (Fast)" \
   --dedupe-workflow "CI Run" \
   --max-cancel 200 \

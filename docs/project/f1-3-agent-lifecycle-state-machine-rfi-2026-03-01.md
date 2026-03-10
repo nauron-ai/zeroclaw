@@ -1,12 +1,11 @@
 # F1-3 Agent Lifecycle State Machine RFI (2026-03-01)
 
 Status: RFI complete, implementation planning ready.
-GitHub issue: [#2308](https://github.com/zeroclaw-labs/zeroclaw/issues/2308)
-Linear: [RMN-256](https://linear.app/zeroclawlabs/issue/RMN-256/rfi-f1-3-agent-lifecycle-state-machine)
+GitHub issue: [#2308](https://github.com/nauron-ai/labaclaw/issues/2308)
 
 ## Summary
 
-ZeroClaw currently has strong component supervision and health snapshots, but it does not expose a
+LabaClaw currently has strong component supervision and health snapshots, but it does not expose a
 formal agent lifecycle state model. This RFI defines a lifecycle FSM, transition contract,
 synchronization model, persistence posture, and migration path that can be implemented without
 changing existing daemon reliability behavior.

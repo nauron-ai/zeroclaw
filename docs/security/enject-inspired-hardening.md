@@ -4,7 +4,7 @@ Date: 2026-02-28
 
 ## Scope
 
-This document records a focused security review of `GreatScott/enject` and maps the useful controls to ZeroClaw runtime/tooling.
+This document records a focused security review of `GreatScott/enject` and maps the useful controls to LabaClaw runtime/tooling.
 
 The goal is not feature parity with `enject` (a dedicated secret-injection CLI), but to import practical guardrail patterns for agent safety and operational reliability.
 
@@ -19,7 +19,7 @@ From `enject` architecture and source review:
 5. Encryption/writes should be authenticated and atomic.
 6. Tooling should avoid convenience features that become exfiltration channels (for example, no `get`/`export`).
 
-## Applied to ZeroClaw
+## Applied to LabaClaw
 
 ### 1) Sensitive file access policy was centralized
 

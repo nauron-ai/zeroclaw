@@ -1,16 +1,16 @@
-# ZeroClaw Plugin System
+# LabaClaw Plugin System
 
-A plugin architecture for ZeroClaw modeled after [OpenClaw's plugin system](https://github.com/openclaw/openclaw), adapted for Rust.
+A plugin architecture for LabaClaw modeled after [OpenClaw's plugin system](https://github.com/openclaw/openclaw), adapted for Rust.
 
 ## Overview
 
-The plugin system allows extending ZeroClaw with custom tools, hooks, channels, and providers without modifying the core codebase. Plugins are discovered from standard directories, loaded at startup, and registered with the host through a clean API.
+The plugin system allows extending LabaClaw with custom tools, hooks, channels, and providers without modifying the core codebase. Plugins are discovered from standard directories, loaded at startup, and registered with the host through a clean API.
 
 ## Architecture
 
 ### Key Components
 
-1. **Manifest** (`zeroclaw.plugin.toml`): Declares plugin metadata (id, name, version, description)
+1. **Manifest** (`labaclaw.plugin.toml`): Declares plugin metadata (id, name, version, description)
 2. **Plugin trait**: Defines the contract plugins must implement (`manifest()` + `register()`)
 3. **PluginApi**: Passed to `register()` so plugins can contribute tools, hooks, etc.
 4. **Discovery**: Scans bundled, global, and workspace extension directories
@@ -19,9 +19,9 @@ The plugin system allows extending ZeroClaw with custom tools, hooks, channels, 
 
 ### Comparison to OpenClaw
 
-| OpenClaw (TypeScript)              | ZeroClaw (Rust)                    |
+| OpenClaw (TypeScript)              | LabaClaw (Rust)                    |
 |------------------------------------|------------------------------------|
-| `openclaw.plugin.json`             | `zeroclaw.plugin.toml`             |
+| `openclaw.plugin.json`             | `labaclaw.plugin.toml`             |
 | `OpenClawPluginDefinition`         | `Plugin` trait                     |
 | `OpenClawPluginApi`                | `PluginApi` struct                 |
 | `PluginRegistry` (class)           | `PluginRegistry` struct            |
@@ -33,12 +33,12 @@ The plugin system allows extending ZeroClaw with custom tools, hooks, channels, 
 
 ### 1. Create the manifest
 
-`extensions/hello-world/zeroclaw.plugin.toml`:
+`extensions/hello-world/labaclaw.plugin.toml`:
 
 ```toml
 id = "hello-world"
 name = "Hello World"
-description = "Example plugin demonstrating the ZeroClaw plugin API."
+description = "Example plugin demonstrating the LabaClaw plugin API."
 version = "0.1.0"
 ```
 
@@ -47,8 +47,8 @@ version = "0.1.0"
 `extensions/hello-world/src/lib.rs`:
 
 ```rust
-use zeroclaw::plugins::{Plugin, PluginApi, PluginManifest};
-use zeroclaw::tools::traits::{Tool, ToolResult};
+use labaclaw::plugins::{Plugin, PluginApi, PluginManifest};
+use labaclaw::tools::traits::{Tool, ToolResult};
 use async_trait::async_trait;
 
 pub struct HelloWorldPlugin {
@@ -112,7 +112,7 @@ impl Tool for HelloTool {
 struct HelloHook;
 
 #[async_trait]
-impl zeroclaw::hooks::HookHandler for HelloHook {
+impl labaclaw::hooks::HookHandler for HelloHook {
     fn name(&self) -> &str { "hello-world:session-logger" }
     async fn on_session_start(&self, session_id: &str, channel: &str) {
         tracing::info!(plugin = "hello-world", session_id, channel, "session started");
@@ -125,7 +125,7 @@ impl zeroclaw::hooks::HookHandler for HelloHook {
 For now, plugins must be compiled into the binary. In `src/gateway/mod.rs` or wherever plugins are initialized:
 
 ```rust
-use zeroclaw::plugins::{load_plugins, Plugin};
+use labaclaw::plugins::{load_plugins, Plugin};
 use hello_world_plugin::HelloWorldPlugin;
 
 let builtin_plugins: Vec<Box<dyn Plugin>> = vec![
@@ -137,7 +137,7 @@ let registry = load_plugins(&config.plugins, workspace_dir, builtin_plugins);
 
 ### 4. Enable in config
 
-`~/.zeroclaw/config.toml`:
+`~/.labaclaw/config.toml`:
 
 ```toml
 [plugins]
@@ -193,11 +193,11 @@ fn register(&self, api: &mut PluginApi) -> anyhow::Result<()> {
 Plugins are discovered from:
 
 1. **Bundled**: Compiled-in plugins (registered directly in code)
-2. **Global**: `~/.zeroclaw/extensions/`
-3. **Workspace**: `<workspace>/.zeroclaw/extensions/`
+2. **Global**: `~/.labaclaw/extensions/`
+3. **Workspace**: `<workspace>/.labaclaw/extensions/`
 4. **Custom**: Paths in `plugins.load_paths`
 
-Each directory is scanned for subdirectories containing `zeroclaw.plugin.toml`.
+Each directory is scanned for subdirectories containing `labaclaw.plugin.toml`.
 
 ## Error Isolation
 
@@ -205,7 +205,7 @@ Plugins are isolated from the host:
 
 - Panics in `register()` are caught and recorded as diagnostics
 - Errors returned from `register()` are logged and the plugin is marked as failed
-- A bad plugin won't crash ZeroClaw
+- A bad plugin won't crash LabaClaw
 
 ## Plugin API
 
@@ -218,7 +218,7 @@ Plugins are isolated from the host:
 
 ### Available Hooks
 
-Implement `zeroclaw::hooks::HookHandler`:
+Implement `labaclaw::hooks::HookHandler`:
 
 - `on_session_start(session_id, channel)`
 - `on_session_end(session_id, channel)`
@@ -228,7 +228,7 @@ Implement `zeroclaw::hooks::HookHandler`:
 ## Future Extensions
 
 - **Dynamic loading**: Load plugins from `.so`/`.dylib`/`.wasm` at runtime (currently requires compilation)
-- **Hot reload**: Reload plugins without restarting ZeroClaw
+- **Hot reload**: Reload plugins without restarting LabaClaw
 - **Plugin marketplace**: Discover and install community plugins
 - **Sandboxing**: Run untrusted plugins in isolated processes or WASM
 
@@ -247,4 +247,4 @@ See `extensions/hello-world/` for a complete working example.
 ## References
 
 - [OpenClaw Plugin System](https://github.com/openclaw/openclaw/tree/main/src/plugins)
-- [Issue #1414](https://github.com/zeroclaw-labs/zeroclaw/issues/1414)
+- [Issue #1414](https://github.com/nauron-ai/labaclaw/issues/1414)
