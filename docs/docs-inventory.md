@@ -9,7 +9,7 @@ Last reviewed: **March 10, 2026**.
 - **Current Guide/Reference**: intended to describe the target LabaClaw operator surface
 - **Policy/Process**: contribution or governance contract
 - **Proposal/Roadmap**: exploratory or planned behavior
-- **Snapshot/Audit**: time-bound status, RFI, or audit history
+- **Snapshot/Audit**: time-bound status or audit history retained only when still operationally relevant
 
 ## Entry Points
 
@@ -32,8 +32,6 @@ Last reviewed: **March 10, 2026**.
 | `docs/hardware/README.md` | Current Guide | hardware builders |
 | `docs/contributing/README.md` | Current Guide | contributors/reviewers |
 | `docs/sop/README.md` | Current Guide | operators/automation maintainers |
-
-Historical snapshots are retained below as archive material. Active project tracking is no longer part of the main docs navigation.
 
 ## Current Guides And References
 
@@ -93,21 +91,9 @@ These are useful context, but not strict runtime contracts.
 | `docs/frictionless-security.md` | Proposal |
 | `docs/security-roadmap.md` | Roadmap |
 
-## Snapshot And Audit Docs
-
-| Doc | Type |
-|---|---|
-| `docs/project/README.md` | Archive Index |
-| `docs/project-triage-snapshot-2026-02-18.md` | Snapshot |
-| `docs/docs-audit-2026-02-24.md` | Snapshot |
-| `docs/project/m4-5-rfi-spike-2026-02-28.md` | Snapshot |
-| `docs/project/f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md` | Snapshot |
-| `docs/project/q0-3-stop-reason-state-machine-rfi-2026-03-01.md` | Snapshot |
-
 ## Maintenance Contract
 
 1. Update `docs/SUMMARY.md` and the nearest category index when adding a major doc.
 2. Keep the documentation English-only and use the target LabaClaw surface in user-facing docs.
 3. Limit ZeroClaw mentions to fork provenance, runtime migration status, and upstream sync policy.
-4. Keep snapshots date-stamped and immutable; add newer snapshots instead of rewriting historical ones.
-5. Do not add active project-tracking or Linear workflow surfaces back into the main docs navigation while migration is in flight.
+4. Remove stale planning and project-tracking docs instead of carrying them forward once they stop serving the active LabaClaw direction.

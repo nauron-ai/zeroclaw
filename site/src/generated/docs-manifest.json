@@ -470,27 +470,6 @@
     "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/docker-setup.md"
   },
   {
-    "id": "docs-docs-audit-2026-02-24-md",
-    "path": "docs/docs-audit-2026-02-24.md",
-    "title": "Documentation Audit Snapshot (2026-02-24)",
-    "summary": "This snapshot records a documentation audit performed before the repository moved to the current English-only LabaClaw docs model.",
-    "section": "archive",
-    "language": "en",
-    "journey": "build",
-    "audience": "builder",
-    "kind": "report",
-    "tags": [
-      "archive",
-      "build",
-      "builder",
-      "report",
-      "security"
-    ],
-    "readingMinutes": 2,
-    "startHere": false,
-    "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/docs-audit-2026-02-24.md"
-  },
-  {
     "id": "docs-docs-inventory-md",
     "path": "docs/docs-inventory.md",
     "title": "LabaClaw Documentation Inventory",
@@ -506,7 +485,7 @@
       "docs-inventory.md",
       "report"
     ],
-    "readingMinutes": 4,
+    "readingMinutes": 3,
     "startHere": false,
     "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/docs-inventory.md"
   },
@@ -949,47 +928,6 @@
     "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/operations/self-hosted-runner-remediation.md"
   },
   {
-    "id": "docs-plans-2026-02-22-wasm-plugin-runtime-design-md",
-    "path": "docs/plans/2026-02-22-wasm-plugin-runtime-design.md",
-    "title": "WASM Plugin Runtime Design (Capability-Segmented, WASI Preview 2)",
-    "summary": "LabaClaw currently uses in-process trait/factory extension points for providers, tools, channels, memory, runtime adapters, observers, peripherals, and hooks. Hook interfaces exist, but several lifecycle events are eithe",
-    "section": "plans",
-    "language": "en",
-    "journey": "build",
-    "audience": "builder",
-    "kind": "guide",
-    "tags": [
-      "build",
-      "builder",
-      "guide",
-      "plans",
-      "reference"
-    ],
-    "readingMinutes": 3,
-    "startHere": false,
-    "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/plans/2026-02-22-wasm-plugin-runtime-design.md"
-  },
-  {
-    "id": "docs-plans-2026-02-22-wasm-plugin-runtime-md",
-    "path": "docs/plans/2026-02-22-wasm-plugin-runtime.md",
-    "title": "WASM Plugin Runtime Implementation Plan",
-    "summary": "hook points, ObserverBridge, and hot-reload with safe fallback.",
-    "section": "plans",
-    "language": "en",
-    "journey": "build",
-    "audience": "builder",
-    "kind": "guide",
-    "tags": [
-      "build",
-      "builder",
-      "guide",
-      "plans"
-    ],
-    "readingMinutes": 6,
-    "startHere": false,
-    "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/plans/2026-02-22-wasm-plugin-runtime.md"
-  },
-  {
     "id": "docs-plugins-runtime-md",
     "path": "docs/plugins-runtime.md",
     "title": "WASM Plugin Runtime (Experimental)",
@@ -1049,112 +987,6 @@
     "readingMinutes": 9,
     "startHere": false,
     "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/pr-workflow.md"
-  },
-  {
-    "id": "docs-project-triage-snapshot-2026-02-18-md",
-    "path": "docs/project-triage-snapshot-2026-02-18.md",
-    "title": "LabaClaw Project Triage Snapshot (2026-02-18)",
-    "summary": "As-of date: February 18, 2026.",
-    "section": "archive",
-    "language": "en",
-    "journey": "build",
-    "audience": "builder",
-    "kind": "report",
-    "tags": [
-      "archive",
-      "build",
-      "builder",
-      "contributing",
-      "report"
-    ],
-    "readingMinutes": 2,
-    "startHere": false,
-    "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/project-triage-snapshot-2026-02-18.md"
-  },
-  {
-    "id": "docs-project-f1-3-agent-lifecycle-state-machine-rfi-2026-03-01-md",
-    "path": "docs/project/f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md",
-    "title": "F1-3 Agent Lifecycle State Machine RFI (2026-03-01)",
-    "summary": "Status: RFI complete, implementation planning ready.",
-    "section": "archive",
-    "language": "en",
-    "journey": "build",
-    "audience": "builder",
-    "kind": "guide",
-    "tags": [
-      "archive",
-      "build",
-      "builder",
-      "contributing",
-      "guide"
-    ],
-    "readingMinutes": 5,
-    "startHere": false,
-    "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/project/f1-3-agent-lifecycle-state-machine-rfi-2026-03-01.md"
-  },
-  {
-    "id": "docs-project-m4-5-rfi-spike-2026-02-28-md",
-    "path": "docs/project/m4-5-rfi-spike-2026-02-28.md",
-    "title": "M4-5 Multi-Crate Workspace RFI Spike (2026-02-28)",
-    "summary": "Status: RFI complete, extraction execution pending.",
-    "section": "archive",
-    "language": "en",
-    "journey": "build",
-    "audience": "builder",
-    "kind": "guide",
-    "tags": [
-      "archive",
-      "build",
-      "builder",
-      "contributing",
-      "guide"
-    ],
-    "readingMinutes": 3,
-    "startHere": false,
-    "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/project/m4-5-rfi-spike-2026-02-28.md"
-  },
-  {
-    "id": "docs-project-q0-3-stop-reason-state-machine-rfi-2026-03-01-md",
-    "path": "docs/project/q0-3-stop-reason-state-machine-rfi-2026-03-01.md",
-    "title": "Q0-3 Stop-Reason State Machine + Max-Tokens Continuation RFI (2026-03-01)",
-    "summary": "Status: RFI complete, implementation planning ready.",
-    "section": "archive",
-    "language": "en",
-    "journey": "build",
-    "audience": "builder",
-    "kind": "guide",
-    "tags": [
-      "archive",
-      "build",
-      "builder",
-      "contributing",
-      "guide"
-    ],
-    "readingMinutes": 4,
-    "startHere": false,
-    "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/project/q0-3-stop-reason-state-machine-rfi-2026-03-01.md"
-  },
-  {
-    "id": "docs-project-readme-md",
-    "path": "docs/project/README.md",
-    "title": "Historical Snapshot Archive",
-    "summary": "This directory is an archive for dated RFIs and planning snapshots carried forward during the LabaClaw fork transition.",
-    "section": "archive",
-    "language": "en",
-    "journey": "build",
-    "audience": "builder",
-    "kind": "guide",
-    "tags": [
-      "archive",
-      "build",
-      "builder",
-      "contributing",
-      "guide",
-      "onboarding"
-    ],
-    "readingMinutes": 1,
-    "startHere": false,
-    "sourceUrl": "https://github.com/nauron-ai/labaclaw/blob/main/docs/project/README.md"
   },
   {
     "id": "docs-providers-reference-md",

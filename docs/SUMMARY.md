@@ -90,8 +90,3 @@ Last refreshed: **March 10, 2026**.
 - [sop/observability.md](sop/observability.md)
 - [sop/cookbook.md](sop/cookbook.md)
 - [migration/openclaw-migration-guide.md](migration/openclaw-migration-guide.md)
-
-## Historical Snapshots
-
-- [project-triage-snapshot-2026-02-18.md](project-triage-snapshot-2026-02-18.md)
-- [docs-audit-2026-02-24.md](docs-audit-2026-02-24.md)

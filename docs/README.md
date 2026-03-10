@@ -23,7 +23,7 @@ Last refreshed: **March 10, 2026**.
 | Operate the runtime day to day | [operations-runbook.md](operations-runbook.md) |
 | Troubleshoot failures | [troubleshooting.md](troubleshooting.md) |
 | Review docs structure and governance | [structure/README.md](structure/README.md) |
-| Inspect inventory and historical snapshots | [docs-inventory.md](docs-inventory.md) |
+| Inspect inventory and maintained doc sets | [docs-inventory.md](docs-inventory.md) |
 
 ## Recommended Routes
 
@@ -40,4 +40,3 @@ Last refreshed: **March 10, 2026**.
 - English is the only maintained documentation language in this repository.
 - User-facing docs should use the LabaClaw surface and naming.
 - Mentions of ZeroClaw are limited to fork provenance, runtime migration status, and upstream sync policy.
-- Historical project snapshots remain archived, but project tracking is no longer part of the active docs surface.

@@ -28,8 +28,7 @@ Last refreshed: **March 10, 2026**.
 
 - task-first setup guides live at docs root or in `docs/getting-started/`
 - runtime contract references live in canonical English docs
-- snapshots and RFIs stay date-stamped and immutable after publication
-- archived project notes may live under `docs/project/`, but they are not part of the active category spine
+- stale plans and project-tracking notes should be removed instead of archived once they stop serving active work
 
 ## Placement Rules
 
@@ -43,8 +42,7 @@ Last refreshed: **March 10, 2026**.
    - the nearest category index,
    - `docs/SUMMARY.md`,
    - `docs/docs-inventory.md`.
-5. Historical snapshots can keep historical analysis, but should not keep dead navigation links to removed locale trees or deleted shims.
-6. Do not add active project-tracking or Linear workflow entry points to the docs spine while planning migrates to the new system.
+5. Remove stale plans and project-tracking docs rather than preserving them in the docs spine.
 
 ## Governance Notes
 

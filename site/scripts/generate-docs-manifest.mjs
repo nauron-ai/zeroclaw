@@ -40,14 +40,6 @@ function detectSection(relativePath) {
     return "root";
   }
 
-  if (
-    rel.startsWith("docs/project/") ||
-    rel.startsWith("docs/project-triage-snapshot-") ||
-    rel.startsWith("docs/docs-audit-")
-  ) {
-    return "archive";
-  }
-
   const parts = rel.split("/");
   return parts[1] || "docs";
 }
