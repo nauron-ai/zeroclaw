@@ -1,6 +1,6 @@
-# ZeroClaw ESP32 UI Firmware
+# LabaClaw ESP32 UI Firmware
 
-Slint-based graphical UI firmware scaffold for ZeroClaw edge scenarios on ESP32.
+Slint-based graphical UI firmware scaffold for LabaClaw edge scenarios on ESP32.
 
 ## Scope of This Crate
 
@@ -26,7 +26,7 @@ What this crate **does not** do yet:
 ## Project Structure
 
 ```text
-firmware/zeroclaw-esp32-ui/
+firmware/esp32-ui/
 ├── Cargo.toml          # Rust package and feature flags
 ├── build.rs            # Slint compilation hook
 ├── .cargo/
@@ -56,7 +56,7 @@ firmware/zeroclaw-esp32-ui/
 ### Default target (ESP32-C3, from `.cargo/config.toml`)
 
 ```bash
-cd firmware/zeroclaw-esp32-ui
+cd firmware/esp32-ui
 cargo build --release
 cargo espflash flash --release --monitor
 ```
@@ -92,7 +92,7 @@ These components are placeholders to keep future hardware integration incrementa
 
 1. Wire real display driver initialization in `src/main.rs`
 2. Attach touch input events to Slint callbacks
-3. Connect UI state with ZeroClaw edge/runtime messaging
+3. Connect UI state with LabaClaw edge/runtime messaging
 4. Add board-specific pin maps with explicit target profiles
 
 ## License
@@ -103,4 +103,4 @@ MIT - See root `LICENSE`
 
 - [Slint ESP32 Documentation](https://slint.dev/esp32)
 - [ESP-IDF Rust Book](https://esp-rs.github.io/book/)
-- [ZeroClaw Hardware Design](../../docs/hardware-peripherals-design.md)
+- [LabaClaw Hardware Design](../../docs/hardware-peripherals-design.md)
