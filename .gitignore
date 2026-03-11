@@ -40,6 +40,13 @@ otp-secret
 credentials.json
 /config.toml
 .worktrees/
+.zeroclaw/*
+
+# Skill eval workspaces (test outputs, transcripts, grading)
+.claude/skills/*-workspace/
+
+# Coverage artifacts
+lcov.info
 
 # Nix
 result

@@ -1083,6 +1083,53 @@ pub(crate) fn provider_credential_available(name: &str, credential_override: Opt
     resolve_provider_credential(name, credential_override).is_some()
 }
 
+/// Check whether an API key's prefix matches the selected provider.
+///
+/// Returns `Some("likely_provider")` when the key clearly belongs to a
+/// different provider. Returns `None` when everything looks fine or the
+/// format is unrecognised.
+fn check_api_key_prefix(provider_name: &str, key: &str) -> Option<&'static str> {
+    let likely_provider = if key.starts_with("sk-ant-") {
+        Some("anthropic")
+    } else if key.starts_with("sk-or-") {
+        Some("openrouter")
+    } else if key.starts_with("sk-") {
+        Some("openai")
+    } else if key.starts_with("gsk_") {
+        Some("groq")
+    } else if key.starts_with("pplx-") {
+        Some("perplexity")
+    } else if key.starts_with("xai-") {
+        Some("xai")
+    } else if key.starts_with("nvapi-") {
+        Some("nvidia")
+    } else if key.starts_with("KEY-") {
+        Some("telnyx")
+    } else {
+        None
+    };
+
+    let expected = likely_provider?;
+
+    let matches = match provider_name {
+        "anthropic" => expected == "anthropic",
+        "openrouter" => expected == "openrouter",
+        "openai" => expected == "openai",
+        "groq" => expected == "groq",
+        "perplexity" => expected == "perplexity",
+        "xai" | "grok" => expected == "xai",
+        "nvidia" | "nvidia-nim" | "build.nvidia.com" => expected == "nvidia",
+        "telnyx" => expected == "telnyx",
+        _ => return None,
+    };
+
+    if matches {
+        None
+    } else {
+        Some(expected)
+    }
+}
+
 fn parse_custom_provider_url(
     raw_url: &str,
     provider_label: &str,
