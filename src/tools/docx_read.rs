@@ -61,7 +61,24 @@ fn extract_docx_text(bytes: &[u8]) -> anyhow::Result<String> {
             }
             Ok(Event::Text(e)) => {
                 if in_text {
-                    text.push_str(&e.unescape()?);
+                    text.push_str(e.decode()?.as_ref());
+                }
+            }
+            Ok(Event::GeneralRef(e)) => {
+                if in_text {
+                    if let Some(ch) = e.resolve_char_ref()? {
+                        text.push(ch);
+                    } else {
+                        let decoded = e.decode()?;
+                        let entity = quick_xml::escape::resolve_predefined_entity(decoded.as_ref())
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "Unsupported XML entity reference in DOCX text: {}",
+                                    decoded.as_ref()
+                                )
+                            })?;
+                        text.push_str(entity);
+                    }
                 }
             }
             Ok(Event::Eof) => break,
@@ -468,6 +485,12 @@ mod tests {
             text.contains('\n'),
             "paragraphs should be separated by newline"
         );
+    }
+
+    #[test]
+    fn extract_docx_text_unescapes_xml_entities() {
+        let text = extract_docx_text(&minimal_docx_bytes("Tom &amp; Jerry")).unwrap();
+        assert!(text.contains("Tom & Jerry"), "unexpected text: {text}");
     }
 
     #[cfg(unix)]

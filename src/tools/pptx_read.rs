@@ -131,7 +131,25 @@ fn extract_pptx_text_with_limits(
                 }
                 Ok(Event::Text(e)) => {
                     if in_text {
-                        text.push_str(&e.unescape()?);
+                        text.push_str(e.decode()?.as_ref());
+                    }
+                }
+                Ok(Event::GeneralRef(e)) => {
+                    if in_text {
+                        if let Some(ch) = e.resolve_char_ref()? {
+                            text.push(ch);
+                        } else {
+                            let decoded = e.decode()?;
+                            let entity =
+                                quick_xml::escape::resolve_predefined_entity(decoded.as_ref())
+                                    .ok_or_else(|| {
+                                        anyhow::anyhow!(
+                                            "Unsupported XML entity reference in PPTX text: {}",
+                                            decoded.as_ref()
+                                        )
+                                    })?;
+                            text.push_str(entity);
+                        }
                     }
                 }
                 Ok(Event::Eof) => break,
@@ -871,6 +889,16 @@ mod tests {
 
         let extracted = extract_pptx_text(&bytes).expect("extract text");
         assert!(extracted.contains("Visible"));
+    }
+
+    #[test]
+    fn extract_pptx_text_unescapes_xml_entities() {
+        let bytes = minimal_pptx_bytes("Road &amp; Track");
+        let extracted = extract_pptx_text(&bytes).expect("extract text");
+        assert!(
+            extracted.contains("Road & Track"),
+            "unexpected text: {extracted}"
+        );
     }
 
     #[cfg(unix)]

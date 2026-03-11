@@ -179,7 +179,24 @@ fn parse_shared_strings<R: std::io::Read + std::io::Seek>(
             }
             Ok(Event::Text(e)) => {
                 if in_t {
-                    current.push_str(&e.unescape()?);
+                    current.push_str(e.decode()?.as_ref());
+                }
+            }
+            Ok(Event::GeneralRef(e)) => {
+                if in_t {
+                    if let Some(ch) = e.resolve_char_ref()? {
+                        current.push(ch);
+                    } else {
+                        let decoded = e.decode()?;
+                        let entity = quick_xml::escape::resolve_predefined_entity(decoded.as_ref())
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "Unsupported XML entity reference in XLSX shared strings: {}",
+                                    decoded.as_ref()
+                                )
+                            })?;
+                        current.push_str(entity);
+                    }
                 }
             }
             Ok(Event::Eof) => break,
@@ -402,7 +419,24 @@ fn extract_sheet_cells(xml: &str, shared_strings: &[String]) -> anyhow::Result<S
             }
             Ok(Event::Text(e)) => {
                 if in_value {
-                    cell_value.push_str(&e.unescape()?);
+                    cell_value.push_str(e.decode()?.as_ref());
+                }
+            }
+            Ok(Event::GeneralRef(e)) => {
+                if in_value {
+                    if let Some(ch) = e.resolve_char_ref()? {
+                        cell_value.push(ch);
+                    } else {
+                        let decoded = e.decode()?;
+                        let entity = quick_xml::escape::resolve_predefined_entity(decoded.as_ref())
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "Unsupported XML entity reference in XLSX cell text: {}",
+                                    decoded.as_ref()
+                                )
+                            })?;
+                        cell_value.push_str(entity);
+                    }
                 }
             }
             Ok(Event::Eof) => break,
@@ -966,6 +1000,28 @@ mod tests {
         assert!(result.output.contains("Age"));
         assert!(result.output.contains("Alice"));
         assert!(result.output.contains("30"));
+    }
+
+    #[tokio::test]
+    async fn extracts_unescaped_entities_from_xlsx() {
+        let tmp = TempDir::new().unwrap();
+        let xlsx_path = tmp.path().join("entities.xlsx");
+        let rows = vec![vec!["Tom &amp; Jerry"]];
+        tokio::fs::write(&xlsx_path, minimal_xlsx_bytes(&rows))
+            .await
+            .unwrap();
+
+        let tool = XlsxReadTool::new(test_security(tmp.path().to_path_buf()));
+        let result = tool
+            .execute(json!({"path": "entities.xlsx"}))
+            .await
+            .unwrap();
+        assert!(result.success, "error: {:?}", result.error);
+        assert!(
+            result.output.contains("Tom & Jerry"),
+            "unexpected output: {}",
+            result.output
+        );
     }
 
     #[tokio::test]
