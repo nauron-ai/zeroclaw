@@ -7,7 +7,6 @@ include_paths = [
   "benches",
   "fuzz",
   "firmware",
-  "clients/android-bridge",
   "templates/rust",
 ]
 

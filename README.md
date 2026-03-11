@@ -47,6 +47,8 @@ labaclaw channel list
 
 For the standalone operator dashboard, use [`labaclaw-web`](https://github.com/nauron-ai/labaclaw-web) against the runtime origin. `labaclaw` no longer embeds or serves the SPA from the binary. For cross-origin dashboard deployments, allow the dashboard origin with `gateway.dashboard_allowed_origins` or `LABACLAW_DASHBOARD_ALLOWED_ORIGINS` as documented in [docs/config-reference.md](docs/config-reference.md) and [docs/network-deployment.md](docs/network-deployment.md).
 
+For the native Android app and JNI bridge, use [`labaclaw-android`](https://github.com/nauron-ai/labaclaw-android). This repository keeps Android support only for the headless runtime binaries, Termux, and cross-compilation workflows.
+
 ## Start Reading
 
 - Docs hub: [docs/README.md](docs/README.md)
