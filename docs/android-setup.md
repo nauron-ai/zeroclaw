@@ -1,6 +1,8 @@
-# Android Setup
+# Android Runtime Setup
 
-LabaClaw provides prebuilt binaries for Android devices.
+LabaClaw provides prebuilt headless runtime binaries for Android devices.
+
+For the native Android app and JNI bridge, use [`labaclaw-android`](https://github.com/nauron-ai/labaclaw-android). This document covers Termux, ADB, and cross-compiling the `labaclaw` runtime itself.
 
 ## Supported Architectures
 
