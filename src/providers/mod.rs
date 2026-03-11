@@ -1255,7 +1255,7 @@ fn create_provider_with_url_and_options(
             .is_some();
         if !is_custom && !has_custom_url {
             if let Some(likely_provider) = check_api_key_prefix(name, key_value) {
-                let visible = &key_value[..key_value.len().min(8)];
+                let visible: String = key_value.chars().take(8).collect();
                 anyhow::bail!(
                     "API key prefix mismatch: key \"{visible}...\" looks like a \
                      {likely_provider} key, but provider \"{name}\" is selected. \
