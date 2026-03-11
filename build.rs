@@ -57,11 +57,6 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=LABACLAW_GIT_SHORT_SHA");
 
-    let web_dist_dir = PathBuf::from("web/dist");
-    if !web_dist_dir.exists() {
-        std::fs::create_dir_all(&web_dist_dir).expect("failed to create web/dist/");
-    }
-
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     emit_git_rerun_hints(&manifest_dir);
 

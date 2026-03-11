@@ -1770,6 +1770,9 @@ pub struct GatewayConfig {
     /// Allow binding to non-localhost without a tunnel (default: false)
     #[serde(default)]
     pub allow_public_bind: bool,
+    /// Browser origins allowed to call dashboard-oriented HTTP APIs from a separate web app.
+    #[serde(default)]
+    pub dashboard_allowed_origins: Vec<String>,
     /// Paired bearer tokens (managed automatically, not user-edited)
     #[serde(default)]
     pub paired_tokens: Vec<String>,
@@ -1861,6 +1864,7 @@ impl Default for GatewayConfig {
             host: default_gateway_host(),
             require_pairing: true,
             allow_public_bind: false,
+            dashboard_allowed_origins: Vec::new(),
             paired_tokens: Vec::new(),
             pair_rate_limit_per_minute: default_pair_rate_limit(),
             webhook_rate_limit_per_minute: default_webhook_rate_limit(),
@@ -9081,6 +9085,15 @@ impl Config {
             self.gateway.allow_public_bind = val == "1" || val.eq_ignore_ascii_case("true");
         }
 
+        if let Some(origins) = env_value_any(&["LABACLAW_DASHBOARD_ALLOWED_ORIGINS"]) {
+            self.gateway.dashboard_allowed_origins = origins
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToOwned::to_owned)
+                .collect();
+        }
+
         // Temperature: LABACLAW_TEMPERATURE
         if let Some(temp_str) = env_value_any(&["LABACLAW_TEMPERATURE"]) {
             if let Ok(temp) = temp_str.parse::<f64>() {
@@ -11929,6 +11942,10 @@ allowed_sender_ids = ["U111", "U222"]
             host: "127.0.0.1".into(),
             require_pairing: true,
             allow_public_bind: false,
+            dashboard_allowed_origins: vec![
+                "https://ops.example.com".into(),
+                "http://localhost:4173".into(),
+            ],
             paired_tokens: vec!["zc_test_token".into()],
             pair_rate_limit_per_minute: 12,
             webhook_rate_limit_per_minute: 80,
@@ -11946,6 +11963,10 @@ allowed_sender_ids = ["U111", "U222"]
         let parsed: GatewayConfig = toml::from_str(&toml_str).unwrap();
         assert!(parsed.require_pairing);
         assert!(!parsed.allow_public_bind);
+        assert_eq!(
+            parsed.dashboard_allowed_origins,
+            vec!["https://ops.example.com", "http://localhost:4173"]
+        );
         assert_eq!(parsed.paired_tokens, vec!["zc_test_token"]);
         assert_eq!(parsed.pair_rate_limit_per_minute, 12);
         assert_eq!(parsed.webhook_rate_limit_per_minute, 80);

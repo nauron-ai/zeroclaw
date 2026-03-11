@@ -987,6 +987,13 @@ Environment overrides:
 | `port` | `42617` | gateway listen port |
 | `require_pairing` | `true` | require pairing before bearer auth |
 | `allow_public_bind` | `false` | block accidental public exposure |
+| `dashboard_allowed_origins` | `[]` | browser origin allowlist for standalone dashboard HTTP/SSE/WS access |
+
+Notes:
+
+- `dashboard_allowed_origins` should contain exact origins such as `https://ops.example.com` or `http://localhost:4173`.
+- Environment override: `LABACLAW_DASHBOARD_ALLOWED_ORIGINS=https://ops.example.com,http://localhost:4173`
+- When empty, no CORS headers are added for dashboard-style browser access and `/ws/chat` does not enforce an origin allowlist.
 
 ## `[gateway.node_control]` (experimental)
 

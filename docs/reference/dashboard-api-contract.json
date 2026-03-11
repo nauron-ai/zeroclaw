@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "owner": "labaclaw",
+  "description": "Runtime-owned contract for the standalone dashboard web client.",
+  "http": [
+    {
+      "name": "pair",
+      "method": "POST",
+      "path": "/pair",
+      "auth": "public",
+      "request_headers": ["X-Pairing-Code"]
+    },
+    {
+      "name": "health",
+      "method": "GET",
+      "path": "/health",
+      "auth": "public"
+    },
+    {
+      "name": "status",
+      "method": "GET",
+      "path": "/api/status",
+      "auth": "bearer"
+    },
+    {
+      "name": "config_get",
+      "method": "GET",
+      "path": "/api/config",
+      "auth": "bearer"
+    },
+    {
+      "name": "config_put",
+      "method": "PUT",
+      "path": "/api/config",
+      "auth": "bearer"
+    },
+    {
+      "name": "tools",
+      "method": "GET",
+      "path": "/api/tools",
+      "auth": "bearer"
+    },
+    {
+      "name": "cron_list",
+      "method": "GET",
+      "path": "/api/cron",
+      "auth": "bearer"
+    },
+    {
+      "name": "cron_add",
+      "method": "POST",
+      "path": "/api/cron",
+      "auth": "bearer"
+    },
+    {
+      "name": "cron_delete",
+      "method": "DELETE",
+      "path": "/api/cron/{id}",
+      "auth": "bearer"
+    },
+    {
+      "name": "integrations",
+      "method": "GET",
+      "path": "/api/integrations",
+      "auth": "bearer"
+    },
+    {
+      "name": "integration_settings",
+      "method": "GET",
+      "path": "/api/integrations/settings",
+      "auth": "bearer"
+    },
+    {
+      "name": "integration_credentials_put",
+      "method": "PUT",
+      "path": "/api/integrations/{id}/credentials",
+      "auth": "bearer"
+    },
+    {
+      "name": "doctor",
+      "method": "POST",
+      "path": "/api/doctor",
+      "auth": "bearer"
+    },
+    {
+      "name": "memory_list",
+      "method": "GET",
+      "path": "/api/memory",
+      "auth": "bearer"
+    },
+    {
+      "name": "memory_store",
+      "method": "POST",
+      "path": "/api/memory",
+      "auth": "bearer"
+    },
+    {
+      "name": "memory_delete",
+      "method": "DELETE",
+      "path": "/api/memory/{key}",
+      "auth": "bearer"
+    },
+    {
+      "name": "cost",
+      "method": "GET",
+      "path": "/api/cost",
+      "auth": "bearer"
+    },
+    {
+      "name": "cli_tools",
+      "method": "GET",
+      "path": "/api/cli-tools",
+      "auth": "bearer"
+    },
+    {
+      "name": "health_snapshot",
+      "method": "GET",
+      "path": "/api/health",
+      "auth": "bearer"
+    },
+    {
+      "name": "pairing_devices",
+      "method": "GET",
+      "path": "/api/pairing/devices",
+      "auth": "bearer"
+    },
+    {
+      "name": "pairing_device_revoke",
+      "method": "DELETE",
+      "path": "/api/pairing/devices/{id}",
+      "auth": "bearer"
+    }
+  ],
+  "streams": [
+    {
+      "name": "events",
+      "transport": "sse",
+      "path": "/api/events",
+      "auth": "bearer"
+    },
+    {
+      "name": "chat",
+      "transport": "websocket",
+      "path": "/ws/chat",
+      "auth": "bearer"
+    }
+  ]
+}

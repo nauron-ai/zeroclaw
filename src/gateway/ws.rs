@@ -372,6 +372,25 @@ pub async fn handle_ws_chat(
     RawQuery(query): RawQuery,
     ws: WebSocketUpgrade,
 ) -> impl IntoResponse {
+    let allowed_dashboard_origins = {
+        let config = state.config.lock();
+        config.gateway.dashboard_allowed_origins.clone()
+    };
+    if !allowed_dashboard_origins.is_empty() {
+        if let Some(origin) = headers
+            .get(header::ORIGIN)
+            .and_then(|value| value.to_str().ok())
+        {
+            if !super::is_dashboard_origin_allowed(&allowed_dashboard_origins, origin) {
+                return (
+                    axum::http::StatusCode::FORBIDDEN,
+                    "Forbidden — dashboard origin is not allowed for /ws/chat",
+                )
+                    .into_response();
+            }
+        }
+    }
+
     let query_params = parse_ws_query_params(query.as_deref());
     let token =
         extract_ws_bearer_token(&headers, query_params.token.as_deref()).unwrap_or_default();
@@ -766,6 +785,22 @@ mod tests {
     fn evaluate_ws_auth_allows_loopback_or_valid_token_when_pairing_disabled() {
         assert_eq!(evaluate_ws_auth(false, true, false), None);
         assert_eq!(evaluate_ws_auth(false, false, true), None);
+    }
+
+    #[test]
+    fn disallows_ws_origin_when_not_in_dashboard_allowlist() {
+        assert!(!crate::gateway::is_dashboard_origin_allowed(
+            &[String::from("https://ops.example.com")],
+            "https://evil.example.com"
+        ));
+    }
+
+    #[test]
+    fn allows_ws_origin_when_in_dashboard_allowlist() {
+        assert!(crate::gateway::is_dashboard_origin_allowed(
+            &[String::from("https://ops.example.com/")],
+            "https://ops.example.com"
+        ));
     }
 
     struct MockScheduleTool;

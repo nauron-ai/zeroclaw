@@ -34,7 +34,6 @@
           inherit (pkgs)
             labaclaw
             zeroclaw
-            zeroclaw-web
             ;
         };
 

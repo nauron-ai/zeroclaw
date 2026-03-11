@@ -93,54 +93,6 @@ fn parse_temperature(s: &str) -> std::result::Result<f64, String> {
     Ok(t)
 }
 
-fn dashboard_open_url(host: &str, port: u16) -> String {
-    let bind_host = host.trim();
-    let browser_host = match bind_host {
-        "0.0.0.0" | "::" | "[::]" => "127.0.0.1",
-        _ => bind_host,
-    };
-    format!("http://{browser_host}:{port}/")
-}
-
-async fn open_url_in_default_browser(url: &str) -> Result<()> {
-    #[cfg(target_os = "macos")]
-    let mut command = {
-        let mut command = tokio::process::Command::new("open");
-        command.arg(url);
-        command
-    };
-
-    #[cfg(target_os = "linux")]
-    let mut command = {
-        let mut command = tokio::process::Command::new("xdg-open");
-        command.arg(url);
-        command
-    };
-
-    #[cfg(target_os = "windows")]
-    let mut command = {
-        let mut command = tokio::process::Command::new("cmd");
-        command.args(["/C", "start", "", url]);
-        command
-    };
-
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    {
-        let _ = url;
-        bail!("automatic dashboard open is unsupported on this platform");
-    }
-
-    #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-    {
-        let status = command.status().await?;
-        if status.success() {
-            Ok(())
-        } else {
-            bail!("browser launcher exited with status {status}");
-        }
-    }
-}
-
 mod agent;
 mod approval;
 mod auth;
@@ -351,7 +303,6 @@ Examples:
   labaclaw gateway                  # use config defaults
   labaclaw gateway -p 8080          # listen on port 8080
   labaclaw gateway --host 0.0.0.0   # bind to all interfaces
-  labaclaw gateway --open-dashboard # open web dashboard automatically
   labaclaw gateway -p 0             # random available port
   labaclaw gateway --new-pairing    # clear tokens and generate fresh pairing code")]
     Gateway {
@@ -366,10 +317,6 @@ Examples:
         /// Clear all paired tokens and generate a fresh pairing code
         #[arg(long)]
         new_pairing: bool,
-
-        /// Open the web dashboard URL in the default browser on startup
-        #[arg(long)]
-        open_dashboard: bool,
     },
 
     /// Start long-running autonomous runtime (gateway + channels + heartbeat + scheduler)
@@ -1143,7 +1090,6 @@ async fn main() -> Result<()> {
             port,
             host,
             new_pairing,
-            open_dashboard,
         } => {
             if new_pairing {
                 // Persist token reset from raw config so env-derived overrides are not written to disk.
@@ -1159,25 +1105,6 @@ async fn main() -> Result<()> {
                 info!("🚀 Starting LabaClaw Gateway on {host} (random port)");
             } else {
                 info!("🚀 Starting LabaClaw Gateway on {host}:{port}");
-            }
-            if open_dashboard {
-                if port == 0 {
-                    warn!(
-                        "--open-dashboard requires a fixed port; skipping auto-open because --port 0 uses a random port"
-                    );
-                } else {
-                    let dashboard_url = dashboard_open_url(&host, port);
-                    tokio::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_millis(750)).await;
-                        if let Err(err) = open_url_in_default_browser(&dashboard_url).await {
-                            warn!(
-                                "Could not open dashboard automatically ({err}). Open manually: {dashboard_url}"
-                            );
-                        } else {
-                            info!("🌐 Opened dashboard in browser: {dashboard_url}");
-                        }
-                    });
-                }
             }
             gateway::run_gateway(&host, port, config).await
         }
@@ -2608,24 +2535,6 @@ mod tests {
     }
 
     #[test]
-    fn gateway_help_includes_open_dashboard_flag() {
-        let cmd = Cli::command();
-        let gateway = cmd
-            .get_subcommands()
-            .find(|subcommand| subcommand.get_name() == "gateway")
-            .expect("gateway subcommand must exist");
-
-        let has_open_dashboard_flag = gateway.get_arguments().any(|arg| {
-            arg.get_id().as_str() == "open_dashboard" && arg.get_long() == Some("open-dashboard")
-        });
-
-        assert!(
-            has_open_dashboard_flag,
-            "gateway help should include --open-dashboard"
-        );
-    }
-
-    #[test]
     fn gateway_cli_accepts_new_pairing_flag() {
         let cli = Cli::try_parse_from(["labaclaw", "gateway", "--new-pairing"])
             .expect("gateway --new-pairing should parse");
@@ -2637,45 +2546,15 @@ mod tests {
     }
 
     #[test]
-    fn gateway_cli_accepts_open_dashboard_flag() {
-        let cli = Cli::try_parse_from(["labaclaw", "gateway", "--open-dashboard"])
-            .expect("gateway --open-dashboard should parse");
-
-        match cli.command {
-            Commands::Gateway { open_dashboard, .. } => assert!(open_dashboard),
-            other => panic!("expected gateway command, got {other:?}"),
-        }
-    }
-
-    #[test]
     fn gateway_cli_defaults_flags_to_false() {
         let cli = Cli::try_parse_from(["labaclaw", "gateway"]).expect("gateway should parse");
 
         match cli.command {
-            Commands::Gateway {
-                new_pairing,
-                open_dashboard,
-                ..
-            } => {
+            Commands::Gateway { new_pairing, .. } => {
                 assert!(!new_pairing);
-                assert!(!open_dashboard);
             }
             other => panic!("expected gateway command, got {other:?}"),
         }
-    }
-
-    #[test]
-    fn dashboard_open_url_prefers_loopback_for_wildcard_bind_hosts() {
-        assert_eq!(
-            dashboard_open_url("0.0.0.0", 42617),
-            "http://127.0.0.1:42617/"
-        );
-        assert_eq!(dashboard_open_url("::", 42617), "http://127.0.0.1:42617/");
-        assert_eq!(dashboard_open_url("[::]", 42617), "http://127.0.0.1:42617/");
-        assert_eq!(
-            dashboard_open_url("127.0.0.1", 42617),
-            "http://127.0.0.1:42617/"
-        );
     }
 
     #[test]

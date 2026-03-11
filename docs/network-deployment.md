@@ -97,6 +97,15 @@ labaclaw daemon --host 0.0.0.0 --port 42617
 
 **Security:** `allow_public_bind = true` exposes the gateway to your local network. Only use on trusted LANs.
 
+If you run the standalone `labaclaw-web` dashboard on a different origin, also configure:
+
+```toml
+[gateway]
+dashboard_allowed_origins = ["https://ops.example.com"]
+```
+
+This allowlist is used for browser CORS preflight handling and WebSocket origin checks.
+
 ### 3.2 Option B: Tunnel (Recommended for Webhooks)
 
 If you need a **public URL** (e.g. WhatsApp webhook, external clients):

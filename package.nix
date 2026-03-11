@@ -2,7 +2,6 @@
   makeRustPlatform,
   rustToolchain,
   lib,
-  zeroclaw-web,
   removeReferencesTo,
 }:
 let
@@ -35,11 +34,6 @@ rustPlatform.buildRustPackage (finalAttrs: {
         ])
       );
     };
-  prePatch = ''
-    mkdir web
-    ln -s ${zeroclaw-web} web/dist
-  '';
-
   cargoLock.lockFile = ./Cargo.lock;
 
   nativeBuildInputs = [

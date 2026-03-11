@@ -45,6 +45,8 @@ labaclaw config show
 labaclaw channel list
 ```
 
+For the standalone operator dashboard, use [`labaclaw-web`](https://github.com/nauron-ai/labaclaw-web) against the runtime origin. `labaclaw` no longer embeds or serves the SPA from the binary.
+
 ## Start Reading
 
 - Docs hub: [docs/README.md](docs/README.md)

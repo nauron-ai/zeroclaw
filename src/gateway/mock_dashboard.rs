@@ -303,9 +303,7 @@ max_tool_iterations = 24
                 MockMemoryEntry {
                     id: "mem-1".to_string(),
                     key: "ops.runbook.gateway".to_string(),
-                    content:
-                        "Restart gateway with `labaclaw gateway --open-dashboard` after updates."
-                            .to_string(),
+                    content: "Restart the gateway after updates.".to_string(),
                     category: "operations".to_string(),
                     timestamp: two_hours_ago,
                     session_id: Some("sess_42".to_string()),
