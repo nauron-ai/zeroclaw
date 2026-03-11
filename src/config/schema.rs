@@ -1870,6 +1870,10 @@ fn normalize_dashboard_origin_impl(origin: &str) -> Result<String> {
         other => anyhow::bail!("unsupported origin scheme {other:?}; expected http or https"),
     }
 
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        anyhow::bail!("origins must not include username or password");
+    }
+
     if parsed.path() != "/" || parsed.query().is_some() || parsed.fragment().is_some() {
         anyhow::bail!("origins must not include path, query, or fragment components");
     }
@@ -12697,6 +12701,27 @@ provider_api = "not-a-real-mode"
             err.to_string()
                 .contains("gateway.dashboard_allowed_origins[0] is invalid"),
             "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    async fn dashboard_allowed_origins_with_userinfo_are_rejected() {
+        let mut config = Config::default();
+        config.gateway.dashboard_allowed_origins =
+            vec!["https://user:pass@ops.example.com".to_string()];
+
+        let err = config
+            .validate()
+            .expect_err("dashboard origin with userinfo should be rejected");
+        let detailed = format!("{err:#}");
+        assert!(
+            err.to_string()
+                .contains("gateway.dashboard_allowed_origins[0] is invalid"),
+            "unexpected error: {err}"
+        );
+        assert!(
+            detailed.contains("origins must not include username or password"),
+            "unexpected error: {detailed}"
         );
     }
 
