@@ -1070,60 +1070,6 @@ pub(crate) async fn agent_turn(
         .await
 }
 
-/// Run the tool loop with channel reply_target context, used by channel runtimes
-/// to auto-populate delivery routing for scheduled reminders.
-#[allow(clippy::too_many_arguments)]
-pub(crate) async fn run_tool_call_loop_with_reply_target(
-    provider: &dyn Provider,
-    history: &mut Vec<ChatMessage>,
-    tools_registry: &[Box<dyn Tool>],
-    observer: &dyn Observer,
-    provider_name: &str,
-    model: &str,
-    temperature: f64,
-    silent: bool,
-    approval: Option<&ApprovalManager>,
-    channel_name: &str,
-    reply_target: Option<&str>,
-    multimodal_config: &crate::config::MultimodalConfig,
-    max_tool_iterations: usize,
-    cancellation_token: Option<CancellationToken>,
-    on_delta: Option<tokio::sync::mpsc::Sender<String>>,
-    hooks: Option<&crate::hooks::HookRunner>,
-    excluded_tools: &[String],
-    progress_mode: ProgressMode,
-) -> Result<String> {
-    TOOL_LOOP_PROGRESS_MODE
-        .scope(
-            progress_mode,
-            TOOL_LOOP_CANARY_TOKENS_ENABLED.scope(
-                false,
-                TOOL_LOOP_REPLY_TARGET.scope(
-                    reply_target.map(str::to_string),
-                    run_tool_call_loop(
-                        provider,
-                        history,
-                        tools_registry,
-                        observer,
-                        provider_name,
-                        model,
-                        temperature,
-                        silent,
-                        approval,
-                        channel_name,
-                        multimodal_config,
-                        max_tool_iterations,
-                        cancellation_token,
-                        on_delta,
-                        hooks,
-                        excluded_tools,
-                    ),
-                ),
-            ),
-        )
-        .await
-}
-
 /// Run the tool loop with optional non-CLI approval context scoped to this task.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_tool_call_loop_with_non_cli_approval_context(

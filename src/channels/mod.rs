@@ -2131,6 +2131,9 @@ fn rollback_orphan_user_turn(
 }
 
 fn should_skip_memory_context_entry(key: &str, content: &str) -> bool {
+    const MEMORY_CONTEXT_ATTACHMENT_MARKERS: [&str; 5] =
+        ["[IMAGE:", "[DOCUMENT:", "[VIDEO:", "[AUDIO:", "[VOICE:"];
+
     if memory::is_assistant_autosave_key(key) {
         return true;
     }
@@ -2139,7 +2142,10 @@ fn should_skip_memory_context_entry(key: &str, content: &str) -> bool {
         return true;
     }
 
-    if content.contains("[IMAGE:") {
+    if MEMORY_CONTEXT_ATTACHMENT_MARKERS
+        .iter()
+        .any(|marker| content.contains(marker))
+    {
         return true;
     }
 
@@ -6486,6 +6492,17 @@ mod tests {
         assert!(!should_skip_memory_context_entry("telegram_123_45", "hi"));
     }
 
+    #[test]
+    fn memory_context_skip_rules_exclude_attachment_markers() {
+        for marker in ["[IMAGE:", "[DOCUMENT:", "[VIDEO:", "[AUDIO:", "[VOICE:"] {
+            let content = format!("{marker}/tmp/attachment]\n\nsummarize this");
+            assert!(should_skip_memory_context_entry(
+                "telegram_123_45",
+                &content
+            ));
+        }
+    }
+
     #[tokio::test]
     async fn build_memory_context_excludes_image_marker_entries() {
         let tmp = TempDir::new().unwrap();
@@ -6511,6 +6528,33 @@ mod tests {
         let context = build_memory_context(&mem, "screenshot", 0.0, None).await;
         assert!(!context.contains("[IMAGE:/tmp/workspace/photo_1_2.jpg]"));
         assert!(context.contains("User prefers screenshot descriptions to be concise"));
+    }
+
+    #[tokio::test]
+    async fn build_memory_context_excludes_document_marker_entries() {
+        let tmp = TempDir::new().unwrap();
+        let mem = SqliteMemory::new(tmp.path()).unwrap();
+
+        mem.store(
+            "telegram_user_msg_document",
+            "[DOCUMENT:/tmp/workspace/brief.pdf]\n\nSummarize this document",
+            MemoryCategory::Conversation,
+            None,
+        )
+        .await
+        .unwrap();
+        mem.store(
+            "document_preference",
+            "User wants PDF summaries with bullet points",
+            MemoryCategory::Conversation,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let context = build_memory_context(&mem, "document", 0.0, None).await;
+        assert!(!context.contains("[DOCUMENT:/tmp/workspace/brief.pdf]"));
+        assert!(context.contains("User wants PDF summaries with bullet points"));
     }
 
     #[test]
