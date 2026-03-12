@@ -174,12 +174,12 @@ pub trait Channel: Send + Sync {
 
     /// Pin a message in the channel.
     async fn pin_message(&self, _channel_id: &str, _message_id: &str) -> anyhow::Result<()> {
-        Ok(())
+        anyhow::bail!("pin_message is not supported by channel {}", self.name())
     }
 
     /// Unpin a previously pinned message.
     async fn unpin_message(&self, _channel_id: &str, _message_id: &str) -> anyhow::Result<()> {
-        Ok(())
+        anyhow::bail!("unpin_message is not supported by channel {}", self.name())
     }
 }
 
@@ -316,5 +316,28 @@ mod tests {
             .send_approval_prompt("tester", "req-1", "shell", &args, None)
             .await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn default_pin_methods_return_unsupported_errors() {
+        let channel = DummyChannel;
+
+        let pin_error = channel
+            .pin_message("chan_1", "msg_1")
+            .await
+            .expect_err("pin should fail fast when unsupported");
+        assert!(pin_error
+            .to_string()
+            .contains("pin_message is not supported"));
+        assert!(pin_error.to_string().contains("dummy"));
+
+        let unpin_error = channel
+            .unpin_message("chan_1", "msg_1")
+            .await
+            .expect_err("unpin should fail fast when unsupported");
+        assert!(unpin_error
+            .to_string()
+            .contains("unpin_message is not supported"));
+        assert!(unpin_error.to_string().contains("dummy"));
     }
 }

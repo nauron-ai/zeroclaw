@@ -71,8 +71,8 @@ RUN mkdir -p /zeroclaw-data/.zeroclaw /zeroclaw-data/workspace && \
         '' \
         '[gateway]' \
         'port = 42617' \
-        'host = "[::]"' \
-        'allow_public_bind = true' \
+        'host = "127.0.0.1"' \
+        'allow_public_bind = false' \
         > /zeroclaw-data/.zeroclaw/config.toml && \
     chown -R 65534:65534 /zeroclaw-data
 

@@ -143,6 +143,13 @@ fn embedding_provider_env_key(provider: &str) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+fn resolve_embedding_fallback_api_key(
+    provider: &str,
+    caller_api_key: Option<&String>,
+) -> Option<String> {
+    embedding_provider_env_key(provider).or_else(|| caller_api_key.cloned())
+}
+
 fn resolve_embedding_config(
     config: &MemoryConfig,
     embedding_routes: &[EmbeddingRouteConfig],
@@ -155,8 +162,10 @@ fn resolve_embedding_config(
     // Prefer a provider-specific env var over the caller-supplied key, which
     // may come from the default (chat) provider and differ from the embedding
     // provider (issue #3083: gemini key leaking to openai embeddings endpoint).
-    let fallback_api_key =
-        embedding_provider_env_key(config.embedding_provider.trim()).or(caller_api_key);
+    let fallback_api_key = resolve_embedding_fallback_api_key(
+        config.embedding_provider.trim(),
+        caller_api_key.as_ref(),
+    );
     let fallback = ResolvedEmbeddingConfig {
         provider: config.embedding_provider.trim().to_string(),
         model: config.embedding_model.trim().to_string(),
@@ -201,12 +210,14 @@ fn resolve_embedding_config(
         .map(str::trim)
         .filter(|value: &&str| !value.is_empty())
         .map(|value| value.to_string());
+    let routed_fallback_api_key =
+        resolve_embedding_fallback_api_key(provider, caller_api_key.as_ref());
 
     ResolvedEmbeddingConfig {
         provider: provider.to_string(),
         model: model.to_string(),
         dimensions,
-        api_key: routed_api_key.or(fallback_api_key),
+        api_key: routed_api_key.or(routed_fallback_api_key),
     }
 }
 
@@ -838,5 +849,43 @@ mod tests {
             Some("gemini-key-must-not-be-used"),
             "default_provider key must not leak to the embedding provider"
         );
+    }
+
+    #[test]
+    fn resolve_embedding_config_uses_routed_provider_env_key_for_hint_routes() {
+        let prev_openai = std::env::var("OPENAI_API_KEY").ok();
+        let prev_cohere = std::env::var("COHERE_API_KEY").ok();
+        std::env::set_var("OPENAI_API_KEY", "openai-from-env");
+        std::env::set_var("COHERE_API_KEY", "cohere-from-env");
+
+        let cfg = MemoryConfig {
+            embedding_provider: "openai".into(),
+            embedding_model: "hint:semantic".into(),
+            embedding_dimensions: 1536,
+            ..MemoryConfig::default()
+        };
+        let routes = vec![EmbeddingRouteConfig {
+            hint: "semantic".into(),
+            provider: "cohere".into(),
+            model: "embed-english-v3.0".into(),
+            dimensions: Some(1024),
+            api_key: None,
+        }];
+
+        let resolved = resolve_embedding_config(&cfg, &routes, Some("gemini-caller-key"));
+
+        match prev_openai {
+            Some(value) => std::env::set_var("OPENAI_API_KEY", value),
+            None => std::env::remove_var("OPENAI_API_KEY"),
+        }
+        match prev_cohere {
+            Some(value) => std::env::set_var("COHERE_API_KEY", value),
+            None => std::env::remove_var("COHERE_API_KEY"),
+        }
+
+        assert_eq!(resolved.provider, "cohere");
+        assert_eq!(resolved.api_key.as_deref(), Some("cohere-from-env"));
+        assert_ne!(resolved.api_key.as_deref(), Some("openai-from-env"));
+        assert_ne!(resolved.api_key.as_deref(), Some("gemini-caller-key"));
     }
 }

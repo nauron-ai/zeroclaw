@@ -315,12 +315,9 @@ impl LeakDetector {
 
         let threshold = (HIGH_ENTROPY_BASELINE + (self.sensitivity - 0.5) * 0.6).clamp(3.9, 4.8);
         let mut flagged = false;
+        let content_without_benign_url_paths = normalize_urls_for_entropy_scan(content, threshold);
 
-        static URL_PATTERN: OnceLock<Regex> = OnceLock::new();
-        let url_re = URL_PATTERN.get_or_init(|| Regex::new(r"https?://\S+").unwrap());
-        let content_without_urls = url_re.replace_all(content, "");
-
-        for token in extract_candidate_tokens(&content_without_urls) {
+        for token in extract_candidate_tokens(&content_without_benign_url_paths) {
             if token.len() < ENTROPY_TOKEN_MIN_LEN {
                 continue;
             }
@@ -349,6 +346,76 @@ impl LeakDetector {
             patterns.push("High-entropy token (possible encoded secret)".to_string());
         }
     }
+}
+
+fn normalize_urls_for_entropy_scan(content: &str, threshold: f64) -> String {
+    static URL_PATTERN: OnceLock<Regex> = OnceLock::new();
+    let url_re = URL_PATTERN.get_or_init(|| Regex::new(r"https?://\S+").unwrap());
+    url_re
+        .replace_all(content, |caps: &regex::Captures<'_>| {
+            normalize_url_for_entropy_scan(
+                caps.get(0).map_or("", |matched| matched.as_str()),
+                threshold,
+            )
+        })
+        .into_owned()
+}
+
+fn normalize_url_for_entropy_scan(url: &str, threshold: f64) -> String {
+    let Some(scheme_idx) = url.find("://") else {
+        return url.to_string();
+    };
+    let authority_start = scheme_idx + 3;
+    let tail_start = url[authority_start..]
+        .find(['?', '#'])
+        .map(|offset| authority_start + offset)
+        .unwrap_or(url.len());
+    let authority_end = url[authority_start..tail_start]
+        .find('/')
+        .map(|offset| authority_start + offset)
+        .unwrap_or(tail_start);
+
+    let prefix = &url[..authority_end];
+    let tail = &url[tail_start..];
+    let path = &url[authority_end..tail_start];
+    let preserved_segments = path
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .filter(|segment| looks_like_secret_path_segment(segment, threshold))
+        .collect::<Vec<_>>();
+
+    if preserved_segments.is_empty() {
+        format!("{prefix}{tail}")
+    } else {
+        format!("{prefix}/{}{tail}", preserved_segments.join("/"))
+    }
+}
+
+fn looks_like_secret_path_segment(segment: &str, threshold: f64) -> bool {
+    if segment.len() < ENTROPY_TOKEN_MIN_LEN {
+        return false;
+    }
+    if segment.contains('.') {
+        return false;
+    }
+
+    let has_alpha = segment.chars().any(|c| c.is_ascii_alphabetic());
+    let has_digit = segment.chars().any(|c| c.is_ascii_digit());
+    if !(has_alpha && has_digit) {
+        return false;
+    }
+
+    if segment.contains('-') {
+        let alpha_chunks = segment
+            .split('-')
+            .filter(|chunk| chunk.chars().any(|c| c.is_ascii_alphabetic()))
+            .count();
+        if alpha_chunks > 1 {
+            return false;
+        }
+    }
+
+    shannon_entropy(segment.as_bytes()) >= threshold
 }
 
 fn extract_candidate_tokens(content: &str) -> Vec<&str> {
@@ -383,6 +450,10 @@ fn shannon_entropy(bytes: &[u8]) -> f64 {
 mod tests {
     use super::*;
 
+    fn high_entropy_token() -> String {
+        ["A9sD2kL0", "zQ1xW8vN", "3mR7tY6u", "I4oP2qS9", "dF1gH5jK"].concat()
+    }
+
     #[test]
     fn clean_content_passes() {
         let detector = LeakDetector::new();
@@ -394,7 +465,7 @@ mod tests {
     fn detects_stripe_keys() {
         let detector = LeakDetector::new();
         let content = "My Stripe key is sk_test_1234567890abcdefghijklmnop";
-        let result = detector.scan(content);
+        let result = detector.scan(&content);
         match result {
             LeakResult::Detected { patterns, redacted } => {
                 assert!(patterns.iter().any(|p| p.contains("Stripe")));
@@ -408,7 +479,7 @@ mod tests {
     fn detects_aws_credentials() {
         let detector = LeakDetector::new();
         let content = "AWS key: AKIAIOSFODNN7EXAMPLE";
-        let result = detector.scan(content);
+        let result = detector.scan(&content);
         match result {
             LeakResult::Detected { patterns, .. } => {
                 assert!(patterns.iter().any(|p| p.contains("AWS")));
@@ -425,7 +496,7 @@ mod tests {
 MIIEowIBAAKCAQEA0ZPr5JeyVDonXsKhfq...
 -----END RSA PRIVATE KEY-----
 "#;
-        let result = detector.scan(content);
+        let result = detector.scan(&content);
         match result {
             LeakResult::Detected { patterns, redacted } => {
                 assert!(patterns.iter().any(|p| p.contains("private key")));
@@ -439,7 +510,7 @@ MIIEowIBAAKCAQEA0ZPr5JeyVDonXsKhfq...
     fn detects_jwt_tokens() {
         let detector = LeakDetector::new();
         let content = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
-        let result = detector.scan(content);
+        let result = detector.scan(&content);
         match result {
             LeakResult::Detected { patterns, redacted } => {
                 assert!(patterns.iter().any(|p| p.contains("JWT")));
@@ -511,8 +582,8 @@ MIIEowIBAAKCAQEA0ZPr5JeyVDonXsKhfq...
     #[test]
     fn high_entropy_token_is_detected_and_redacted() {
         let detector = LeakDetector::with_sensitivity(0.9);
-        let content = "token: A9sD2kL0zQ1xW8vN3mR7tY6uI4oP2qS9dF1gH5jK";
-        let result = detector.scan(content);
+        let content = format!("token: {}", high_entropy_token());
+        let result = detector.scan(&content);
         match result {
             LeakResult::Detected { patterns, redacted } => {
                 assert!(patterns.iter().any(|p| p.contains("High-entropy token")));
@@ -542,8 +613,9 @@ MIIEowIBAAKCAQEA0ZPr5JeyVDonXsKhfq...
     #[test]
     fn standalone_high_entropy_tokens_are_still_detected() {
         let detector = LeakDetector::with_sensitivity(0.9);
-        let content = "Found credential: aB3xK9mW2pQ7vL4nR8sT1yU6hD0jF5cG";
-        let result = detector.scan(content);
+        let token = high_entropy_token();
+        let content = format!("Found credential: {token}");
+        let result = detector.scan(&content);
         match result {
             LeakResult::Detected { patterns, redacted } => {
                 assert!(patterns.iter().any(|p| p.contains("High-entropy token")));
@@ -551,6 +623,28 @@ MIIEowIBAAKCAQEA0ZPr5JeyVDonXsKhfq...
             }
             LeakResult::Clean => panic!("expected high-entropy detection"),
         }
+    }
+
+    #[test]
+    fn url_query_tokens_are_still_scanned_for_high_entropy() {
+        let detector = LeakDetector::with_sensitivity(0.9);
+        let content = format!(
+            "Download https://example.org/documents/report.pdf?token={}",
+            high_entropy_token()
+        );
+        let result = detector.scan(&content);
+        assert!(matches!(result, LeakResult::Detected { .. }));
+    }
+
+    #[test]
+    fn url_userinfo_tokens_are_still_scanned_for_high_entropy() {
+        let detector = LeakDetector::with_sensitivity(0.9);
+        let content = format!(
+            "Mirror: https://user:{}@example.org/files/archive",
+            high_entropy_token()
+        );
+        let result = detector.scan(&content);
+        assert!(matches!(result, LeakResult::Detected { .. }));
     }
 
     #[test]
