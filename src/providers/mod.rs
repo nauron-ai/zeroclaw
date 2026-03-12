@@ -993,6 +993,7 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
         "nvidia" | "nvidia-nim" | "build.nvidia.com" => vec!["NVIDIA_API_KEY"],
         "synthetic" => vec!["SYNTHETIC_API_KEY"],
         "opencode" | "opencode-zen" => vec!["OPENCODE_API_KEY"],
+        "opencode-go" => vec!["OPENCODE_GO_API_KEY"],
         "vercel" | "vercel-ai" => vec!["VERCEL_API_KEY"],
         "cloudflare" | "cloudflare-ai" => vec!["CLOUDFLARE_API_KEY"],
         "ovhcloud" | "ovh" => vec!["OVH_AI_ENDPOINTS_ACCESS_TOKEN"],
@@ -1360,6 +1361,12 @@ fn create_provider_with_url_and_options(
         "opencode" | "opencode-zen" => Ok(Box::new(OpenAiCompatibleProvider::new(
             "OpenCode Zen",
             "https://opencode.ai/zen/v1",
+            key,
+            AuthStyle::Bearer,
+        ))),
+        "opencode-go" => Ok(Box::new(OpenAiCompatibleProvider::new(
+            "OpenCode Go",
+            "https://opencode.ai/zen/go/v1",
             key,
             AuthStyle::Bearer,
         ))),
@@ -2061,6 +2068,12 @@ pub fn list_providers() -> Vec<ProviderInfo> {
             name: "opencode",
             display_name: "OpenCode Zen",
             aliases: &["opencode-zen"],
+            local: false,
+        },
+        ProviderInfo {
+            name: "opencode-go",
+            display_name: "OpenCode Go",
+            aliases: &[],
             local: false,
         },
         ProviderInfo {

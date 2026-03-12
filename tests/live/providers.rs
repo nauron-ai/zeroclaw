@@ -14,7 +14,7 @@ use zeroclaw::providers::ProviderRuntimeOptions;
 #[tokio::test]
 #[ignore = "requires live OpenAI Codex OAuth credentials"]
 async fn e2e_live_openai_codex_multi_turn() {
-    use zeroclaw::providers::openai_codex::OpenAiCodexProvider;
+    use zeroclaw::providers::openai::OpenAiCodexProvider;
 
     let provider = OpenAiCodexProvider::new(&ProviderRuntimeOptions::default(), None).unwrap();
     let model = "gpt-5.3-codex";

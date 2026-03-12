@@ -21,6 +21,24 @@ use tokio::io::AsyncWriteExt;
 /// model ID will be normalized by the provider layer.
 pub const DEFAULT_MODEL_FALLBACK: &str = "anthropic/claude-sonnet-4.6";
 
+fn default_config_temperature() -> f64 {
+    0.7
+}
+
+fn deserialize_config_temperature<'de, D>(deserializer: D) -> Result<f64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let temperature = f64::deserialize(deserializer)?;
+    if (0.0..=2.0).contains(&temperature) {
+        Ok(temperature)
+    } else {
+        Err(serde::de::Error::custom(
+            "default_temperature must be between 0.0 and 2.0",
+        ))
+    }
+}
+
 fn canonical_provider_for_model_defaults(provider_name: &str) -> String {
     if let Some(canonical) = canonical_china_provider_name(provider_name) {
         return if canonical == "doubao" {
@@ -245,6 +263,10 @@ pub struct Config {
     #[serde(default)]
     pub provider: ProviderConfig,
     /// Default model temperature (0.0–2.0). Default: `0.7`.
+    #[serde(
+        default = "default_config_temperature",
+        deserialize_with = "deserialize_config_temperature"
+    )]
     pub default_temperature: f64,
 
     /// Observability backend configuration (`[observability]`).
