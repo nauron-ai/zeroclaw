@@ -366,6 +366,10 @@ tokio::task_local! {
     static TOOL_LOOP_CANARY_TOKENS_ENABLED: bool;
 }
 
+tokio::task_local! {
+    static TOOL_LOOP_DEDUP_EXEMPT: Vec<String>;
+}
+
 const AUTO_CRON_DELIVERY_CHANNELS: &[&str] = &[
     "telegram",
     "discord",
@@ -459,6 +463,16 @@ where
     TOOL_LOOP_COST_ENFORCEMENT_CONTEXT
         .scope(context, future)
         .await
+}
+
+pub(crate) async fn scope_tool_call_dedup_exempt<F>(
+    dedup_exempt: Vec<String>,
+    future: F,
+) -> F::Output
+where
+    F: Future,
+{
+    TOOL_LOOP_DEDUP_EXEMPT.scope(dedup_exempt, future).await
 }
 
 fn should_inject_safety_heartbeat(counter: usize, interval: usize) -> bool {
@@ -1248,6 +1262,9 @@ pub async fn run_tool_call_loop(
         .try_with(Clone::clone)
         .ok()
         .flatten();
+    let dedup_exempt_tools = TOOL_LOOP_DEDUP_EXEMPT
+        .try_with(Clone::clone)
+        .unwrap_or_default();
     let progress_mode = TOOL_LOOP_PROGRESS_MODE
         .try_with(|mode| *mode)
         .unwrap_or(ProgressMode::Verbose);
@@ -2313,7 +2330,8 @@ pub async fn run_tool_call_loop(
             }
 
             let signature = tool_call_signature(&tool_name, &tool_args);
-            if !seen_tool_signatures.insert(signature) {
+            let dedup_exempt = dedup_exempt_tools.iter().any(|name| name == &tool_name);
+            if !dedup_exempt && !seen_tool_signatures.insert(signature) {
                 let duplicate = format!(
                     "Skipped duplicate tool call '{tool_name}' with identical arguments in this turn."
                 );
@@ -2802,6 +2820,7 @@ pub async fn run(
         custom_provider_auth_header: config.effective_custom_provider_auth_header(),
         max_tokens_override: None,
         model_support_vision: config.model_support_vision,
+        provider_timeout_secs: Some(config.provider_timeout_secs),
     };
 
     let provider: Box<dyn Provider> = providers::create_routed_provider_with_options(
@@ -3058,23 +3077,26 @@ pub async fn run(
                     ld_cfg,
                     TOOL_LOOP_CANARY_TOKENS_ENABLED.scope(
                         config.security.canary_tokens,
-                        run_tool_call_loop(
-                            provider.as_ref(),
-                            &mut history,
-                            &tools_registry,
-                            observer.as_ref(),
-                            provider_name,
-                            &model_name,
-                            temperature,
-                            false,
-                            approval_manager.as_ref(),
-                            channel_name,
-                            &config.multimodal,
-                            config.agent.max_tool_iterations,
-                            None,
-                            None,
-                            effective_hooks,
-                            &[],
+                        TOOL_LOOP_DEDUP_EXEMPT.scope(
+                            config.agent.tool_call_dedup_exempt.clone(),
+                            run_tool_call_loop(
+                                provider.as_ref(),
+                                &mut history,
+                                &tools_registry,
+                                observer.as_ref(),
+                                provider_name,
+                                &model_name,
+                                temperature,
+                                false,
+                                approval_manager.as_ref(),
+                                channel_name,
+                                &config.multimodal,
+                                config.agent.max_tool_iterations,
+                                None,
+                                None,
+                                effective_hooks,
+                                &[],
+                            ),
                         ),
                     ),
                 ),
@@ -3287,23 +3309,26 @@ pub async fn run(
                         ld_cfg,
                         TOOL_LOOP_CANARY_TOKENS_ENABLED.scope(
                             config.security.canary_tokens,
-                            run_tool_call_loop(
-                                provider.as_ref(),
-                                &mut history,
-                                &tools_registry,
-                                observer.as_ref(),
-                                provider_name,
-                                &model_name,
-                                temperature,
-                                false,
-                                approval_manager.as_ref(),
-                                channel_name,
-                                &config.multimodal,
-                                config.agent.max_tool_iterations,
-                                None,
-                                None,
-                                effective_hooks,
-                                &[],
+                            TOOL_LOOP_DEDUP_EXEMPT.scope(
+                                config.agent.tool_call_dedup_exempt.clone(),
+                                run_tool_call_loop(
+                                    provider.as_ref(),
+                                    &mut history,
+                                    &tools_registry,
+                                    observer.as_ref(),
+                                    provider_name,
+                                    &model_name,
+                                    temperature,
+                                    false,
+                                    approval_manager.as_ref(),
+                                    channel_name,
+                                    &config.multimodal,
+                                    config.agent.max_tool_iterations,
+                                    None,
+                                    None,
+                                    effective_hooks,
+                                    &[],
+                                ),
                             ),
                         ),
                     ),
@@ -3509,6 +3534,7 @@ pub async fn process_message_with_session(
         custom_provider_auth_header: config.effective_custom_provider_auth_header(),
         max_tokens_override: None,
         model_support_vision: config.model_support_vision,
+        provider_timeout_secs: Some(config.provider_timeout_secs),
     };
     let provider: Box<dyn Provider> = providers::create_routed_provider_with_options(
         provider_name,
@@ -3654,17 +3680,20 @@ pub async fn process_message_with_session(
         cost_enforcement_context,
         SAFETY_HEARTBEAT_CONFIG.scope(
             hb_cfg,
-            agent_turn(
-                provider.as_ref(),
-                &mut history,
-                &tools_registry,
-                observer.as_ref(),
-                provider_name,
-                &model_name,
-                config.default_temperature,
-                true,
-                &config.multimodal,
-                config.agent.max_tool_iterations,
+            TOOL_LOOP_DEDUP_EXEMPT.scope(
+                config.agent.tool_call_dedup_exempt.clone(),
+                agent_turn(
+                    provider.as_ref(),
+                    &mut history,
+                    &tools_registry,
+                    observer.as_ref(),
+                    provider_name,
+                    &model_name,
+                    config.default_temperature,
+                    true,
+                    &config.multimodal,
+                    config.agent.max_tool_iterations,
+                ),
             ),
         ),
     )

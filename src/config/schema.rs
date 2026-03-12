@@ -25,6 +25,12 @@ fn default_config_temperature() -> f64 {
     0.7
 }
 
+const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 120;
+
+fn default_provider_timeout_secs() -> u64 {
+    DEFAULT_PROVIDER_TIMEOUT_SECS
+}
+
 fn validate_config_temperature(value: f64) -> std::result::Result<f64, &'static str> {
     if (0.0..=2.0).contains(&value) {
         Ok(value)
@@ -271,6 +277,9 @@ pub struct Config {
     )]
     #[schemars(range(min = 0.0, max = 2.0))]
     pub default_temperature: f64,
+    /// HTTP request timeout in seconds for LLM provider API calls. Default: `120`.
+    #[serde(default = "default_provider_timeout_secs")]
+    pub provider_timeout_secs: u64,
 
     /// Observability backend configuration (`[observability]`).
     #[serde(default)]
@@ -1105,6 +1114,9 @@ pub struct AgentConfig {
     /// Tool dispatch strategy (e.g. `"auto"`). Default: `"auto"`.
     #[serde(default = "default_agent_tool_dispatcher")]
     pub tool_dispatcher: String,
+    /// Tools exempt from the within-turn duplicate-call dedup check.
+    #[serde(default)]
+    pub tool_call_dedup_exempt: Vec<String>,
     /// Optional allowlist for primary-agent tool visibility.
     /// When non-empty, only listed tools are exposed to the primary agent.
     #[serde(default)]
@@ -1248,6 +1260,7 @@ impl Default for AgentConfig {
             max_history_messages: default_agent_max_history_messages(),
             parallel_tools: false,
             tool_dispatcher: default_agent_tool_dispatcher(),
+            tool_call_dedup_exempt: Vec::new(),
             allowed_tools: Vec::new(),
             denied_tools: Vec::new(),
             teams: AgentTeamsConfig::default(),
@@ -6655,6 +6668,7 @@ impl Default for Config {
             model_providers: HashMap::new(),
             provider: ProviderConfig::default(),
             default_temperature: 0.7,
+            provider_timeout_secs: default_provider_timeout_secs(),
             observability: ObservabilityConfig::default(),
             autonomy: AutonomyConfig::default(),
             security: SecurityConfig::default(),
@@ -8495,6 +8509,20 @@ impl Config {
                 anyhow::bail!("agent.denied_tools[{i}] contains invalid characters: {normalized}");
             }
         }
+        for (i, tool_name) in self.agent.tool_call_dedup_exempt.iter().enumerate() {
+            let normalized = tool_name.trim();
+            if normalized.is_empty() {
+                anyhow::bail!("agent.tool_call_dedup_exempt[{i}] must not be empty");
+            }
+            if !normalized
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '*')
+            {
+                anyhow::bail!(
+                    "agent.tool_call_dedup_exempt[{i}] contains invalid characters: {normalized}"
+                );
+            }
+        }
         let built_in_roles = ["owner", "admin", "operator", "viewer", "guest"];
         let mut custom_role_names = std::collections::HashSet::new();
         for (i, role) in self.security.roles.iter().enumerate() {
@@ -9096,6 +9124,14 @@ impl Config {
         // Model: LABACLAW_MODEL or LABACLAW_MODEL or MODEL
         if let Some(model) = env_value_any(&["LABACLAW_MODEL", "MODEL"]) {
             self.default_model = Some(model);
+        }
+
+        if let Ok(timeout_secs) = std::env::var("ZEROCLAW_PROVIDER_TIMEOUT_SECS") {
+            if let Ok(timeout_secs) = timeout_secs.parse::<u64>() {
+                if timeout_secs > 0 {
+                    self.provider_timeout_secs = timeout_secs;
+                }
+            }
         }
 
         // Apply named provider profile remapping (Codex app-server compatibility).
@@ -10517,6 +10553,7 @@ ws_url = "ws://127.0.0.1:3002"
             model_providers: HashMap::new(),
             provider: ProviderConfig::default(),
             default_temperature: 0.5,
+            provider_timeout_secs: 120,
             observability: ObservabilityConfig {
                 backend: "log".into(),
                 ..ObservabilityConfig::default()
@@ -10979,6 +11016,7 @@ denied_tools = ["shell"]
             model_providers: HashMap::new(),
             provider: ProviderConfig::default(),
             default_temperature: 0.9,
+            provider_timeout_secs: 120,
             observability: ObservabilityConfig::default(),
             autonomy: AutonomyConfig::default(),
             security: SecurityConfig::default(),

@@ -53,6 +53,8 @@ pub struct OpenAiCompatibleProvider {
     api_mode: CompatibleApiMode,
     /// Optional max token cap propagated to outbound requests.
     max_tokens_override: Option<u32>,
+    /// HTTP request timeout in seconds for LLM API calls.
+    timeout_secs: u64,
 }
 
 /// How the provider expects the API key to be sent.
@@ -256,7 +258,13 @@ impl OpenAiCompatibleProvider {
             native_tool_calling: !merge_system_into_user,
             api_mode,
             max_tokens_override: max_tokens_override.filter(|value| *value > 0),
+            timeout_secs: 120,
         }
+    }
+
+    pub fn with_timeout_secs(mut self, timeout_secs: u64) -> Self {
+        self.timeout_secs = timeout_secs;
+        self
     }
 
     /// Collect all `system` role messages, concatenate their content,
@@ -291,6 +299,7 @@ impl OpenAiCompatibleProvider {
     }
 
     fn http_client(&self) -> Client {
+        let timeout = self.timeout_secs;
         if let Some(ua) = self.user_agent.as_deref() {
             let mut headers = HeaderMap::new();
             if let Ok(value) = HeaderValue::from_str(ua) {
@@ -298,7 +307,7 @@ impl OpenAiCompatibleProvider {
             }
 
             let builder = Client::builder()
-                .timeout(std::time::Duration::from_secs(120))
+                .timeout(std::time::Duration::from_secs(timeout))
                 .connect_timeout(std::time::Duration::from_secs(10))
                 .default_headers(headers);
             let builder =
@@ -310,7 +319,7 @@ impl OpenAiCompatibleProvider {
             });
         }
 
-        crate::config::build_runtime_proxy_client_with_timeouts("provider.compatible", 120, 10)
+        crate::config::build_runtime_proxy_client_with_timeouts("provider.compatible", timeout, 10)
     }
 
     /// Build the full URL for chat completions, detecting if base_url already includes the path.

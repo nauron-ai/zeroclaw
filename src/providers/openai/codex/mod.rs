@@ -99,7 +99,9 @@ impl OpenAiCodexProvider {
             gateway_api_key: gateway_api_key.map(ToString::to_string),
             reasoning_effort: resolved.reasoning_effort,
             client: Client::builder()
-                .timeout(std::time::Duration::from_secs(120))
+                .timeout(std::time::Duration::from_secs(
+                    options.provider_timeout_secs.unwrap_or(120),
+                ))
                 .connect_timeout(std::time::Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
