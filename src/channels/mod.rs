@@ -1446,6 +1446,7 @@ async fn load_runtime_defaults_from_config_file(
     }
 
     parsed.apply_env_overrides();
+    parsed.validate()?;
     Ok((
         runtime_defaults_from_config(&parsed),
         runtime_autonomy_policy_from_config(&parsed),

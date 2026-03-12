@@ -41,15 +41,7 @@ impl Provider for MockProvider {
     ) -> Result<ChatResponse> {
         let mut guard = self.responses.lock().unwrap();
         if guard.is_empty() {
-            return Ok(ChatResponse {
-                text: Some("done".into()),
-                tool_calls: vec![],
-                usage: None,
-                reasoning_content: None,
-                quota_metadata: None,
-                stop_reason: None,
-                raw_stop_reason: None,
-            });
+            anyhow::bail!("MockProvider exhausted: no scripted responses left");
         }
         Ok(guard.remove(0))
     }
@@ -97,15 +89,7 @@ impl Provider for RecordingProvider {
 
         let mut guard = self.responses.lock().unwrap();
         if guard.is_empty() {
-            return Ok(ChatResponse {
-                text: Some("done".into()),
-                tool_calls: vec![],
-                usage: None,
-                reasoning_content: None,
-                quota_metadata: None,
-                stop_reason: None,
-                raw_stop_reason: None,
-            });
+            anyhow::bail!("RecordingProvider exhausted: no scripted responses left");
         }
         Ok(guard.remove(0))
     }
@@ -205,5 +189,47 @@ impl Provider for TraceLlmProvider {
                 })
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn mock_provider_fails_when_scripted_responses_are_exhausted() {
+        let provider = MockProvider::new(vec![]);
+        let err = provider
+            .chat(
+                ChatRequest {
+                    messages: &[],
+                    tools: None,
+                },
+                "test-model",
+                0.7,
+            )
+            .await
+            .expect_err("empty mock provider should fail fast");
+
+        assert!(err.to_string().contains("MockProvider exhausted"));
+    }
+
+    #[tokio::test]
+    async fn recording_provider_fails_when_scripted_responses_are_exhausted() {
+        let (provider, recorded_requests) = RecordingProvider::new(vec![]);
+        let err = provider
+            .chat(
+                ChatRequest {
+                    messages: &[],
+                    tools: None,
+                },
+                "test-model",
+                0.7,
+            )
+            .await
+            .expect_err("empty recording provider should fail fast");
+
+        assert!(err.to_string().contains("RecordingProvider exhausted"));
+        assert_eq!(recorded_requests.lock().unwrap().len(), 1);
     }
 }
