@@ -93,7 +93,11 @@ impl OpenAiProvider {
     }
 
     pub(super) fn http_client(&self) -> Client {
-        crate::config::build_runtime_proxy_client_with_timeouts("provider.openai", 120, 10)
+        crate::config::build_runtime_proxy_client_with_timeouts(
+            "provider.openai",
+            self.timeout_secs,
+            10,
+        )
     }
 }
 

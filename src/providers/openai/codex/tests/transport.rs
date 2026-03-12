@@ -23,19 +23,7 @@ fn websocket_url_uses_ws_scheme_and_model_query() {
 
 #[test]
 fn capabilities_includes_vision() {
-    let options = ProviderRuntimeOptions {
-        provider_api_url: None,
-        provider_transport: None,
-        labaclaw_dir: None,
-        secrets_encrypt: false,
-        auth_profile_override: None,
-        reasoning_enabled: None,
-        reasoning_level: None,
-        custom_provider_api_mode: None,
-        custom_provider_auth_header: None,
-        max_tokens_override: None,
-        model_support_vision: None,
-    };
+    let options = ProviderRuntimeOptions::default();
     let provider = OpenAiCodexProvider::new(&options, None).expect("provider should initialize");
     let caps = provider.capabilities();
 

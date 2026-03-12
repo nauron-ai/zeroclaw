@@ -18,6 +18,8 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
 
+const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 120;
+
 /// Telnyx AI inference provider.
 ///
 /// Uses the OpenAI-compatible chat completions API at `/v2/ai/chat/completions`.
@@ -50,11 +52,17 @@ impl TelnyxProvider {
     /// 1. `TELNYX_API_KEY` environment variable
     /// 2. `LABACLAW_API_KEY` environment variable (fallback)
     pub fn new(api_key: Option<&str>) -> Self {
+        Self::new_with_timeout(api_key, None)
+    }
+
+    pub fn new_with_timeout(api_key: Option<&str>, timeout_secs: Option<u64>) -> Self {
         let resolved_key = resolve_telnyx_api_key(api_key);
         Self {
             api_key: resolved_key,
             client: Client::builder()
-                .timeout(std::time::Duration::from_secs(120))
+                .timeout(std::time::Duration::from_secs(
+                    timeout_secs.unwrap_or(DEFAULT_PROVIDER_TIMEOUT_SECS),
+                ))
                 .connect_timeout(std::time::Duration::from_secs(10))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
@@ -64,7 +72,7 @@ impl TelnyxProvider {
     /// Create a provider with a custom base URL (for testing or proxies).
     pub fn with_base_url(api_key: Option<&str>, _base_url: &str) -> Self {
         // Note: custom base URL support for testing
-        Self::new(api_key)
+        Self::new_with_timeout(api_key, None)
     }
 
     /// List available models from Telnyx AI.

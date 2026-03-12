@@ -246,6 +246,7 @@ struct ChannelRuntimeDefaults {
     temperature: f64,
     api_key: Option<String>,
     api_url: Option<String>,
+    provider_timeout_secs: u64,
     reliability: crate::config::ReliabilityConfig,
     cost: crate::config::CostConfig,
     auto_save_memory: bool,
@@ -284,6 +285,8 @@ impl Default for RuntimeSemanticGuardState {
 #[derive(Debug, Clone)]
 struct RuntimeConfigState {
     defaults: ChannelRuntimeDefaults,
+    provider_runtime_options: providers::ProviderRuntimeOptions,
+    tool_call_dedup_exempt: Vec<String>,
     perplexity_filter: crate::config::PerplexityFilterConfig,
     outbound_leak_guard: crate::config::OutboundLeakGuardConfig,
     canary_tokens: bool,
@@ -298,6 +301,7 @@ struct RuntimeAutonomyPolicy {
     always_ask: Vec<String>,
     command_context_rules: Vec<crate::config::CommandContextRuleConfig>,
     non_cli_excluded_tools: Vec<String>,
+    tool_call_dedup_exempt: Vec<String>,
     non_cli_approval_approvers: Vec<String>,
     non_cli_natural_language_approval_mode: NonCliNaturalLanguageApprovalMode,
     non_cli_natural_language_approval_mode_by_channel:
@@ -349,6 +353,7 @@ struct ChannelRuntimeContext {
     multimodal: crate::config::MultimodalConfig,
     hooks: Option<Arc<crate::hooks::HookRunner>>,
     non_cli_excluded_tools: Arc<Mutex<Vec<String>>>,
+    tool_call_dedup_exempt: Arc<Vec<String>>,
     query_classification: crate::config::QueryClassificationConfig,
     model_routes: Vec<crate::config::ModelRouteConfig>,
     approval_manager: Arc<ApprovalManager>,
@@ -1142,6 +1147,7 @@ fn runtime_defaults_from_config(config: &Config) -> ChannelRuntimeDefaults {
         temperature: config.default_temperature,
         api_key: config.api_key.clone(),
         api_url: config.api_url.clone(),
+        provider_timeout_secs: config.provider_timeout_secs,
         reliability: config.reliability.clone(),
         cost: config.cost.clone(),
         auto_save_memory: config.memory.auto_save,
@@ -1169,6 +1175,7 @@ fn runtime_autonomy_policy_from_config(config: &Config) -> RuntimeAutonomyPolicy
         always_ask: config.autonomy.always_ask.clone(),
         command_context_rules: config.autonomy.command_context_rules.clone(),
         non_cli_excluded_tools: config.autonomy.non_cli_excluded_tools.clone(),
+        tool_call_dedup_exempt: config.agent.tool_call_dedup_exempt.clone(),
         non_cli_approval_approvers: config.autonomy.non_cli_approval_approvers.clone(),
         non_cli_natural_language_approval_mode: config
             .autonomy
@@ -1208,6 +1215,10 @@ fn runtime_defaults_snapshot(ctx: &ChannelRuntimeContext) -> ChannelRuntimeDefau
         temperature: ctx.temperature,
         api_key: ctx.api_key.clone(),
         api_url: ctx.api_url.clone(),
+        provider_timeout_secs: ctx
+            .provider_runtime_options
+            .provider_timeout_secs
+            .unwrap_or(120),
         reliability: (*ctx.reliability).clone(),
         cost: crate::config::CostConfig::default(),
         auto_save_memory: ctx.auto_save_memory,
@@ -1219,6 +1230,34 @@ fn runtime_defaults_snapshot(ctx: &ChannelRuntimeContext) -> ChannelRuntimeDefau
         query_classification: ctx.query_classification.clone(),
         model_routes: ctx.model_routes.clone(),
     }
+}
+
+fn runtime_tool_call_dedup_exempt_snapshot(ctx: &ChannelRuntimeContext) -> Vec<String> {
+    if let Some(config_path) = runtime_config_path(ctx) {
+        let store = runtime_config_store()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(state) = store.get(&config_path) {
+            return state.tool_call_dedup_exempt.clone();
+        }
+    }
+
+    ctx.tool_call_dedup_exempt.as_ref().clone()
+}
+
+fn runtime_provider_runtime_options_snapshot(
+    ctx: &ChannelRuntimeContext,
+) -> providers::ProviderRuntimeOptions {
+    if let Some(config_path) = runtime_config_path(ctx) {
+        let store = runtime_config_store()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if let Some(state) = store.get(&config_path) {
+            return state.provider_runtime_options.clone();
+        }
+    }
+
+    ctx.provider_runtime_options.clone()
 }
 
 /// Return a snapshot of the runtime perplexity-filter config, falling back to
@@ -1427,7 +1466,11 @@ fn decrypt_optional_secret_for_runtime_reload(
 
 async fn load_runtime_defaults_from_config_file(
     path: &Path,
-) -> Result<(ChannelRuntimeDefaults, RuntimeAutonomyPolicy)> {
+) -> Result<(
+    ChannelRuntimeDefaults,
+    RuntimeAutonomyPolicy,
+    providers::ProviderRuntimeOptions,
+)> {
     let contents = tokio::fs::read_to_string(path)
         .await
         .with_context(|| format!("Failed to read {}", path.display()))?;
@@ -1450,6 +1493,7 @@ async fn load_runtime_defaults_from_config_file(
     Ok((
         runtime_defaults_from_config(&parsed),
         runtime_autonomy_policy_from_config(&parsed),
+        providers::runtime_options_from_config(&parsed),
     ))
 }
 
@@ -1818,16 +1862,20 @@ async fn maybe_apply_runtime_config_update(ctx: &ChannelRuntimeContext) -> Resul
         }
     }
 
-    let (next_defaults, next_autonomy_policy) =
+    let (next_defaults, next_autonomy_policy, next_provider_runtime_options) =
         load_runtime_defaults_from_config_file(&config_path).await?;
-    let next_default_provider = providers::create_resilient_provider_with_options(
-        &next_defaults.default_provider,
-        next_defaults.api_key.as_deref(),
-        next_defaults.api_url.as_deref(),
-        &next_defaults.reliability,
-        &ctx.provider_runtime_options,
-    )?;
-    let next_default_provider: Arc<dyn Provider> = Arc::from(next_default_provider);
+    let next_default_provider: Arc<dyn Provider> = Arc::from(
+        create_routed_provider_nonblocking(
+            &next_defaults.default_provider,
+            next_defaults.api_key.clone(),
+            next_defaults.api_url.clone(),
+            next_defaults.reliability.clone(),
+            next_defaults.model_routes.clone(),
+            next_defaults.model.clone(),
+            next_provider_runtime_options.clone(),
+        )
+        .await?,
+    );
 
     if let Err(err) = next_default_provider.warmup().await {
         tracing::warn!(
@@ -1853,6 +1901,8 @@ async fn maybe_apply_runtime_config_update(ctx: &ChannelRuntimeContext) -> Resul
             config_path.clone(),
             RuntimeConfigState {
                 defaults: next_defaults.clone(),
+                provider_runtime_options: next_provider_runtime_options.clone(),
+                tool_call_dedup_exempt: next_autonomy_policy.tool_call_dedup_exempt.clone(),
                 perplexity_filter: next_autonomy_policy.perplexity_filter.clone(),
                 outbound_leak_guard: next_autonomy_policy.outbound_leak_guard.clone(),
                 canary_tokens: next_autonomy_policy.canary_tokens,
@@ -1895,6 +1945,7 @@ async fn maybe_apply_runtime_config_update(ctx: &ChannelRuntimeContext) -> Resul
             next_autonomy_policy.non_cli_natural_language_approval_mode
         ),
         non_cli_excluded_tools_count = next_autonomy_policy.non_cli_excluded_tools.len(),
+        tool_call_dedup_exempt_count = next_autonomy_policy.tool_call_dedup_exempt.len(),
         perplexity_filter_enabled = next_autonomy_policy.perplexity_filter.enable_perplexity_filter,
         perplexity_threshold = next_autonomy_policy.perplexity_filter.perplexity_threshold,
         outbound_leak_guard_enabled = next_autonomy_policy.outbound_leak_guard.enabled,
@@ -2084,11 +2135,21 @@ fn rollback_orphan_user_turn(
 }
 
 fn should_skip_memory_context_entry(key: &str, content: &str) -> bool {
+    const MEMORY_CONTEXT_ATTACHMENT_MARKERS: [&str; 5] =
+        ["[IMAGE:", "[DOCUMENT:", "[VIDEO:", "[AUDIO:", "[VOICE:"];
+
     if memory::is_assistant_autosave_key(key) {
         return true;
     }
 
     if key.trim().to_ascii_lowercase().ends_with("_history") {
+        return true;
+    }
+
+    if MEMORY_CONTEXT_ATTACHMENT_MARKERS
+        .iter()
+        .any(|marker| content.contains(marker))
+    {
         return true;
     }
 
@@ -2168,7 +2229,7 @@ async fn get_or_create_provider(
         defaults.api_key.clone(),
         api_url.map(ToString::to_string),
         defaults.reliability.clone(),
-        ctx.provider_runtime_options.clone(),
+        runtime_provider_runtime_options_snapshot(ctx),
     )
     .await?;
     let provider: Arc<dyn Provider> = Arc::from(provider);
@@ -4087,27 +4148,30 @@ If this input is legitimate, rephrase the request and avoid instruction-override
             Duration::from_secs(timeout_budget_secs),
             crate::agent::loop_::scope_cost_enforcement_context(
                 cost_enforcement_context,
-                run_tool_call_loop_with_non_cli_approval_context(
-                    active_provider.as_ref(),
-                    &mut history,
-                    ctx.tools_registry.as_ref(),
-                    ctx.observer.as_ref(),
-                    route.provider.as_str(),
-                    route.model.as_str(),
-                    runtime_defaults.temperature,
-                    true,
-                    Some(ctx.approval_manager.as_ref()),
-                    msg.channel.as_str(),
-                    non_cli_approval_context,
-                    &runtime_defaults.multimodal,
-                    runtime_defaults.max_tool_iterations,
-                    Some(cancellation_token.clone()),
-                    delta_tx,
-                    ctx.hooks.as_deref(),
-                    &excluded_tools_snapshot,
-                    progress_mode,
-                    ctx.safety_heartbeat.clone(),
-                    runtime_canary_tokens_snapshot(ctx.as_ref()),
+                crate::agent::loop_::scope_tool_call_dedup_exempt(
+                    runtime_tool_call_dedup_exempt_snapshot(ctx.as_ref()),
+                    run_tool_call_loop_with_non_cli_approval_context(
+                        active_provider.as_ref(),
+                        &mut history,
+                        ctx.tools_registry.as_ref(),
+                        ctx.observer.as_ref(),
+                        route.provider.as_str(),
+                        route.model.as_str(),
+                        runtime_defaults.temperature,
+                        true,
+                        Some(ctx.approval_manager.as_ref()),
+                        msg.channel.as_str(),
+                        non_cli_approval_context,
+                        &runtime_defaults.multimodal,
+                        runtime_defaults.max_tool_iterations,
+                        Some(cancellation_token.clone()),
+                        delta_tx,
+                        ctx.hooks.as_deref(),
+                        &excluded_tools_snapshot,
+                        progress_mode,
+                        ctx.safety_heartbeat.clone(),
+                        runtime_canary_tokens_snapshot(ctx.as_ref()),
+                    ),
                 ),
             ),
         ) => LlmExecutionResult::Completed(result),
@@ -5796,19 +5860,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
 
     let provider_name = resolved_default_provider(&config);
     let model = resolved_default_model(&config);
-    let provider_runtime_options = providers::ProviderRuntimeOptions {
-        auth_profile_override: None,
-        provider_api_url: config.api_url.clone(),
-        provider_transport: config.effective_provider_transport(),
-        labaclaw_dir: config.config_path.parent().map(std::path::PathBuf::from),
-        secrets_encrypt: config.secrets.encrypt,
-        reasoning_enabled: config.runtime.reasoning_enabled,
-        reasoning_level: config.effective_provider_reasoning_level(),
-        custom_provider_api_mode: config.provider_api.map(|mode| mode.as_compatible_mode()),
-        custom_provider_auth_header: config.effective_custom_provider_auth_header(),
-        max_tokens_override: None,
-        model_support_vision: config.model_support_vision,
-    };
+    let provider_runtime_options = providers::runtime_options_from_config(&config);
     let provider: Arc<dyn Provider> = Arc::from(
         create_routed_provider_nonblocking(
             &provider_name,
@@ -5838,6 +5890,8 @@ pub async fn start_channels(config: Config) -> Result<()> {
             config.config_path.clone(),
             RuntimeConfigState {
                 defaults: runtime_defaults_from_config(&config),
+                provider_runtime_options: provider_runtime_options.clone(),
+                tool_call_dedup_exempt: config.agent.tool_call_dedup_exempt.clone(),
                 perplexity_filter: config.security.perplexity_filter.clone(),
                 outbound_leak_guard: config.security.outbound_leak_guard.clone(),
                 canary_tokens: config.security.canary_tokens,
@@ -6198,6 +6252,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
         non_cli_excluded_tools: Arc::new(Mutex::new(
             config.autonomy.non_cli_excluded_tools.clone(),
         )),
+        tool_call_dedup_exempt: Arc::new(config.agent.tool_call_dedup_exempt.clone()),
         query_classification: config.query_classification.clone(),
         model_routes: config.model_routes.clone(),
         // Preserve startup perplexity filter config to ensure policy is not weakened
@@ -6442,6 +6497,71 @@ mod tests {
     }
 
     #[test]
+    fn memory_context_skip_rules_exclude_attachment_markers() {
+        for marker in ["[IMAGE:", "[DOCUMENT:", "[VIDEO:", "[AUDIO:", "[VOICE:"] {
+            let content = format!("{marker}/tmp/attachment]\n\nsummarize this");
+            assert!(should_skip_memory_context_entry(
+                "telegram_123_45",
+                &content
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn build_memory_context_excludes_image_marker_entries() {
+        let tmp = TempDir::new().unwrap();
+        let mem = SqliteMemory::new(tmp.path()).unwrap();
+
+        mem.store(
+            "telegram_user_msg_photo",
+            "[IMAGE:/tmp/workspace/photo_1_2.jpg]\n\nDescribe this screenshot",
+            MemoryCategory::Conversation,
+            None,
+        )
+        .await
+        .unwrap();
+        mem.store(
+            "screenshot_preference",
+            "User prefers screenshot descriptions to be concise",
+            MemoryCategory::Conversation,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let context = build_memory_context(&mem, "screenshot", 0.0, None).await;
+        assert!(!context.contains("[IMAGE:/tmp/workspace/photo_1_2.jpg]"));
+        assert!(context.contains("User prefers screenshot descriptions to be concise"));
+    }
+
+    #[tokio::test]
+    async fn build_memory_context_excludes_document_marker_entries() {
+        let tmp = TempDir::new().unwrap();
+        let mem = SqliteMemory::new(tmp.path()).unwrap();
+
+        mem.store(
+            "telegram_user_msg_document",
+            "[DOCUMENT:/tmp/workspace/brief.pdf]\n\nSummarize this document",
+            MemoryCategory::Conversation,
+            None,
+        )
+        .await
+        .unwrap();
+        mem.store(
+            "document_preference",
+            "User wants PDF summaries with bullet points",
+            MemoryCategory::Conversation,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let context = build_memory_context(&mem, "document", 0.0, None).await;
+        assert!(!context.contains("[DOCUMENT:/tmp/workspace/brief.pdf]"));
+        assert!(context.contains("User wants PDF summaries with bullet points"));
+    }
+
+    #[test]
     fn normalize_cached_channel_turns_merges_consecutive_user_turns() {
         let turns = vec![
             ChatMessage::user("forwarded content"),
@@ -6556,6 +6676,7 @@ mod tests {
             workspace_dir: Arc::new(std::env::temp_dir()),
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -6613,6 +6734,7 @@ mod tests {
             workspace_dir: Arc::new(std::env::temp_dir()),
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -6673,6 +6795,7 @@ mod tests {
             workspace_dir: Arc::new(std::env::temp_dir()),
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -7356,6 +7479,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(vec!["mock_price".to_string()])),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -7441,6 +7565,7 @@ BTC is currently around $65,000 based on latest tool output."#
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             interrupt_on_new_message: false,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -7515,6 +7640,7 @@ BTC is currently around $65,000 based on latest tool output."#
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             interrupt_on_new_message: false,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -7603,6 +7729,7 @@ BTC is currently around $65,000 based on latest tool output."#
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             interrupt_on_new_message: false,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             approval_manager: mock_price_approved_manager(),
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
@@ -7690,6 +7817,7 @@ BTC is currently around $65,000 based on latest tool output."#
             message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
             interrupt_on_new_message: false,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             approval_manager: mock_price_approved_manager(),
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
@@ -7764,6 +7892,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -7838,6 +7967,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -7914,6 +8044,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -8021,6 +8152,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(vec!["mock_price".to_string()])),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -8159,6 +8291,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::clone(&approval_manager),
@@ -8248,6 +8381,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::clone(&approval_manager),
@@ -8326,6 +8460,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -8490,6 +8625,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -8605,6 +8741,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager,
@@ -8715,6 +8852,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(vec!["shell".to_string()])),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager,
@@ -8807,6 +8945,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::clone(&approval_manager),
@@ -8909,6 +9048,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::clone(&approval_manager),
@@ -9012,6 +9152,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(vec!["mock_price".to_string()])),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -9163,6 +9304,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -9260,6 +9402,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -9410,6 +9553,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -9530,6 +9674,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -9630,6 +9775,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -9749,6 +9895,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(&autonomy_cfg)),
@@ -9869,6 +10016,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -9948,6 +10096,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -10003,6 +10152,7 @@ BTC is currently around $65,000 based on latest tool output."#
                         temperature: 0.5,
                         api_key: None,
                         api_url: None,
+                        provider_timeout_secs: 120,
                         reliability: crate::config::ReliabilityConfig::default(),
                         cost: crate::config::CostConfig::default(),
                         auto_save_memory: false,
@@ -10014,6 +10164,11 @@ BTC is currently around $65,000 based on latest tool output."#
                         query_classification: crate::config::QueryClassificationConfig::default(),
                         model_routes: Vec::new(),
                     },
+                    provider_runtime_options: providers::ProviderRuntimeOptions {
+                        labaclaw_dir: Some(temp.path().to_path_buf()),
+                        ..providers::ProviderRuntimeOptions::default()
+                    },
+                    tool_call_dedup_exempt: Vec::new(),
                     perplexity_filter: crate::config::PerplexityFilterConfig::default(),
                     outbound_leak_guard: crate::config::OutboundLeakGuardConfig::default(),
                     canary_tokens: true,
@@ -10056,6 +10211,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -10110,9 +10266,11 @@ BTC is currently around $65,000 based on latest tool output."#
         cfg.workspace_dir = workspace_dir;
         cfg.default_provider = Some("test-provider".to_string());
         cfg.default_model = Some("test-model".to_string());
+        cfg.provider_timeout_secs = 95;
         cfg.autonomy.auto_approve = vec!["mock_price".to_string()];
         cfg.autonomy.always_ask = vec!["shell".to_string()];
         cfg.autonomy.non_cli_excluded_tools = vec!["browser_open".to_string()];
+        cfg.agent.tool_call_dedup_exempt = vec!["mock_price".to_string()];
         cfg.autonomy.non_cli_approval_approvers = vec!["telegram:alice".to_string()];
         cfg.autonomy.non_cli_natural_language_approval_mode =
             crate::config::NonCliNaturalLanguageApprovalMode::Direct;
@@ -10131,17 +10289,34 @@ BTC is currently around $65,000 based on latest tool output."#
         cfg.security.semantic_guard_collection = "semantic_guard_test".to_string();
         cfg.security.semantic_guard_threshold = 0.9;
         cfg.memory.qdrant.url = Some("http://127.0.0.1:6333".to_string());
+        cfg.api_url = Some("https://api.example.test/v1".to_string());
+        cfg.provider.transport = Some("sse".to_string());
+        cfg.runtime.reasoning_enabled = Some(false);
         cfg.save().await.expect("save config");
+        let (defaults, policy, provider_runtime_options) =
+            load_runtime_defaults_from_config_file(&config_path)
+                .await
+                .expect("load runtime state");
 
-        let (_defaults, policy) = load_runtime_defaults_from_config_file(&config_path)
-            .await
-            .expect("load runtime state");
-
+        assert_eq!(defaults.provider_timeout_secs, 95);
+        assert_eq!(
+            provider_runtime_options.provider_api_url.as_deref(),
+            Some("https://api.example.test/v1")
+        );
+        assert_eq!(
+            provider_runtime_options.provider_transport.as_deref(),
+            Some("sse")
+        );
+        assert_eq!(provider_runtime_options.reasoning_enabled, Some(false));
         assert_eq!(policy.auto_approve, vec!["mock_price".to_string()]);
         assert_eq!(policy.always_ask, vec!["shell".to_string()]);
         assert_eq!(
             policy.non_cli_excluded_tools,
             vec!["browser_open".to_string()]
+        );
+        assert_eq!(
+            policy.tool_call_dedup_exempt,
+            vec!["mock_price".to_string()]
         );
         assert_eq!(
             policy.non_cli_approval_approvers,
@@ -10189,9 +10364,10 @@ BTC is currently around $65,000 based on latest tool output."#
         cfg.default_model = None;
         cfg.save().await.expect("save config");
 
-        let (defaults, _policy) = load_runtime_defaults_from_config_file(&config_path)
-            .await
-            .expect("runtime defaults");
+        let (defaults, _policy, _provider_runtime_options) =
+            load_runtime_defaults_from_config_file(&config_path)
+                .await
+                .expect("runtime defaults");
         assert_eq!(defaults.default_provider, "openai");
         assert_eq!(defaults.model, "gpt-5.2");
     }
@@ -10209,11 +10385,16 @@ BTC is currently around $65,000 based on latest tool output."#
         cfg.default_provider = Some("ollama".to_string());
         cfg.default_model = Some("llama3.2".to_string());
         cfg.api_key = Some("http://127.0.0.1:11434".to_string());
+        cfg.provider_timeout_secs = 45;
         cfg.memory.auto_save = false;
         cfg.memory.min_relevance_score = 0.15;
         cfg.agent.max_tool_iterations = 5;
+        cfg.agent.tool_call_dedup_exempt = vec!["mock_price".to_string()];
         cfg.channels_config.message_timeout_secs = 45;
         cfg.multimodal.allow_remote_fetch = false;
+        cfg.api_url = Some("https://api.initial.example/v1".to_string());
+        cfg.provider.transport = Some("sse".to_string());
+        cfg.runtime.reasoning_enabled = Some(false);
         cfg.query_classification.enabled = false;
         cfg.model_routes = vec![];
         cfg.autonomy.non_cli_natural_language_approval_mode =
@@ -10254,6 +10435,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -10276,6 +10458,30 @@ BTC is currently around $65,000 based on latest tool output."#
         assert_eq!(
             snapshot_non_cli_excluded_tools(runtime_ctx.as_ref()),
             vec!["shell".to_string()]
+        );
+        assert_eq!(
+            runtime_tool_call_dedup_exempt_snapshot(runtime_ctx.as_ref()),
+            vec!["mock_price".to_string()]
+        );
+        assert_eq!(
+            runtime_provider_runtime_options_snapshot(runtime_ctx.as_ref()).provider_timeout_secs,
+            Some(45)
+        );
+        assert_eq!(
+            runtime_provider_runtime_options_snapshot(runtime_ctx.as_ref())
+                .provider_api_url
+                .as_deref(),
+            Some("https://api.initial.example/v1")
+        );
+        assert_eq!(
+            runtime_provider_runtime_options_snapshot(runtime_ctx.as_ref())
+                .provider_transport
+                .as_deref(),
+            Some("sse")
+        );
+        assert_eq!(
+            runtime_provider_runtime_options_snapshot(runtime_ctx.as_ref()).reasoning_enabled,
+            Some(false)
         );
         assert!(!runtime_perplexity_filter_snapshot(runtime_ctx.as_ref()).enable_perplexity_filter);
         assert_eq!(
@@ -10313,6 +10519,11 @@ BTC is currently around $65,000 based on latest tool output."#
         cfg.memory.auto_save = true;
         cfg.memory.min_relevance_score = 0.65;
         cfg.agent.max_tool_iterations = 11;
+        cfg.agent.tool_call_dedup_exempt = vec!["browser_open".to_string()];
+        cfg.provider_timeout_secs = 180;
+        cfg.api_url = Some("https://api.updated.example/v1".to_string());
+        cfg.provider.transport = Some("websocket".to_string());
+        cfg.runtime.reasoning_enabled = Some(true);
         cfg.channels_config.message_timeout_secs = 120;
         cfg.multimodal.allow_remote_fetch = true;
         cfg.query_classification.enabled = true;
@@ -10354,6 +10565,30 @@ BTC is currently around $65,000 based on latest tool output."#
             snapshot_non_cli_excluded_tools(runtime_ctx.as_ref()),
             vec!["browser_open".to_string(), "mock_price".to_string()]
         );
+        assert_eq!(
+            runtime_tool_call_dedup_exempt_snapshot(runtime_ctx.as_ref()),
+            vec!["browser_open".to_string()]
+        );
+        assert_eq!(
+            runtime_provider_runtime_options_snapshot(runtime_ctx.as_ref()).provider_timeout_secs,
+            Some(180)
+        );
+        assert_eq!(
+            runtime_provider_runtime_options_snapshot(runtime_ctx.as_ref())
+                .provider_api_url
+                .as_deref(),
+            Some("https://api.updated.example/v1")
+        );
+        assert_eq!(
+            runtime_provider_runtime_options_snapshot(runtime_ctx.as_ref())
+                .provider_transport
+                .as_deref(),
+            Some("websocket")
+        );
+        assert_eq!(
+            runtime_provider_runtime_options_snapshot(runtime_ctx.as_ref()).reasoning_enabled,
+            Some(true)
+        );
         let perplexity_cfg = runtime_perplexity_filter_snapshot(runtime_ctx.as_ref());
         assert!(perplexity_cfg.enable_perplexity_filter);
         assert_eq!(perplexity_cfg.perplexity_threshold, 12.5);
@@ -10386,6 +10621,84 @@ BTC is currently around $65,000 based on latest tool output."#
             .lock()
             .unwrap_or_else(|e| e.into_inner());
         store.remove(&config_path);
+    }
+
+    #[tokio::test]
+    async fn maybe_apply_runtime_config_update_preserves_routed_provider_startup_behavior() {
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let config_path = temp.path().join("config.toml");
+        let workspace_dir = temp.path().join("workspace");
+        std::fs::create_dir_all(&workspace_dir).expect("workspace dir");
+
+        let mut cfg = Config::default();
+        cfg.config_path = config_path.clone();
+        cfg.workspace_dir = workspace_dir;
+        cfg.default_provider = None;
+        cfg.api_key = None;
+        cfg.default_model = Some("hint:fast".to_string());
+        cfg.model_routes = vec![crate::config::ModelRouteConfig {
+            hint: "fast".to_string(),
+            provider: "openai-codex".to_string(),
+            model: "gpt-5.3-codex".to_string(),
+            max_tokens: Some(512),
+            api_key: Some("route-specific-key".to_string()),
+            transport: Some("sse".to_string()),
+        }];
+        cfg.save().await.expect("save config");
+
+        let runtime_ctx = Arc::new(ChannelRuntimeContext {
+            channels_by_name: Arc::new(HashMap::new()),
+            provider: Arc::new(ModelCaptureProvider::default()),
+            default_provider: Arc::new("openrouter".to_string()),
+            memory: Arc::new(NoopMemory),
+            tools_registry: Arc::new(vec![]),
+            observer: Arc::new(NoopObserver),
+            system_prompt: Arc::new("test-system-prompt".to_string()),
+            model: Arc::new("hint:fast".to_string()),
+            temperature: 0.0,
+            auto_save_memory: false,
+            max_tool_iterations: 5,
+            min_relevance_score: 0.0,
+            conversation_histories: Arc::new(Mutex::new(HashMap::new())),
+            conversation_locks: Default::default(),
+            session_config: crate::config::AgentSessionConfig::default(),
+            session_manager: None,
+            provider_cache: Arc::new(Mutex::new(HashMap::new())),
+            route_overrides: Arc::new(Mutex::new(HashMap::new())),
+            api_key: None,
+            api_url: None,
+            reliability: Arc::new(crate::config::ReliabilityConfig::default()),
+            provider_runtime_options: providers::ProviderRuntimeOptions {
+                labaclaw_dir: Some(temp.path().to_path_buf()),
+                ..providers::ProviderRuntimeOptions::default()
+            },
+            workspace_dir: Arc::new(std::env::temp_dir()),
+            message_timeout_secs: CHANNEL_MESSAGE_TIMEOUT_SECS,
+            interrupt_on_new_message: false,
+            multimodal: crate::config::MultimodalConfig::default(),
+            hooks: None,
+            non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
+            query_classification: crate::config::QueryClassificationConfig::default(),
+            model_routes: Vec::new(),
+            approval_manager: Arc::new(ApprovalManager::from_config(
+                &crate::config::AutonomyConfig::default(),
+            )),
+            safety_heartbeat: None,
+            startup_perplexity_filter: crate::config::PerplexityFilterConfig::default(),
+        });
+
+        let result = maybe_apply_runtime_config_update(runtime_ctx.as_ref()).await;
+
+        let mut store = runtime_config_store()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        store.remove(&config_path);
+
+        assert!(
+            result.is_ok(),
+            "runtime config reload should support routed providers without global credentials: {result:?}"
+        );
     }
 
     #[tokio::test]
@@ -10461,6 +10774,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -10529,6 +10843,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: mock_price_approved_manager(),
@@ -10709,6 +11024,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -10799,6 +11115,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -10901,6 +11218,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -10985,6 +11303,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -11054,6 +11373,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -11733,6 +12053,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -11829,6 +12150,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -11924,6 +12246,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -12023,6 +12346,7 @@ BTC is currently around $65,000 based on latest tool output."#
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -12851,6 +13175,7 @@ BTC is currently around $65,000 based on latest tool output."#;
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(
@@ -12927,6 +13252,7 @@ BTC is currently around $65,000 based on latest tool output."#;
             multimodal: crate::config::MultimodalConfig::default(),
             hooks: None,
             non_cli_excluded_tools: Arc::new(Mutex::new(Vec::new())),
+            tool_call_dedup_exempt: Arc::new(Vec::new()),
             query_classification: crate::config::QueryClassificationConfig::default(),
             model_routes: Vec::new(),
             approval_manager: Arc::new(ApprovalManager::from_config(

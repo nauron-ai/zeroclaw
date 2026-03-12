@@ -8,9 +8,12 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 120;
+
 pub struct OpenRouterProvider {
     credential: Option<String>,
     max_tokens_override: Option<u32>,
+    timeout_secs: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -156,13 +159,22 @@ struct NativeResponseMessage {
 
 impl OpenRouterProvider {
     pub fn new(credential: Option<&str>) -> Self {
-        Self::new_with_max_tokens(credential, None)
+        Self::new_with_max_tokens_and_timeout(credential, None, None)
     }
 
     pub fn new_with_max_tokens(credential: Option<&str>, max_tokens_override: Option<u32>) -> Self {
+        Self::new_with_max_tokens_and_timeout(credential, max_tokens_override, None)
+    }
+
+    pub fn new_with_max_tokens_and_timeout(
+        credential: Option<&str>,
+        max_tokens_override: Option<u32>,
+        timeout_secs: Option<u64>,
+    ) -> Self {
         Self {
             credential: credential.map(ToString::to_string),
             max_tokens_override: max_tokens_override.filter(|value| *value > 0),
+            timeout_secs: timeout_secs.unwrap_or(DEFAULT_PROVIDER_TIMEOUT_SECS),
         }
     }
 
@@ -318,7 +330,11 @@ impl OpenRouterProvider {
     }
 
     fn http_client(&self) -> Client {
-        crate::config::build_runtime_proxy_client_with_timeouts("provider.openrouter", 120, 10)
+        crate::config::build_runtime_proxy_client_with_timeouts(
+            "provider.openrouter",
+            self.timeout_secs,
+            10,
+        )
     }
 }
 

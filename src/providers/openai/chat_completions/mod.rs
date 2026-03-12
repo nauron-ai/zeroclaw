@@ -18,15 +18,16 @@ pub struct OpenAiProvider {
     base_url: String,
     credential: Option<String>,
     max_tokens_override: Option<u32>,
+    timeout_secs: u64,
 }
 
 impl OpenAiProvider {
     pub fn new(credential: Option<&str>) -> Self {
-        Self::with_base_url_and_max_tokens(None, credential, None)
+        Self::with_base_url_and_max_tokens_and_timeout(None, credential, None, None)
     }
 
     pub fn with_base_url(base_url: Option<&str>, credential: Option<&str>) -> Self {
-        Self::with_base_url_and_max_tokens(base_url, credential, None)
+        Self::with_base_url_and_max_tokens_and_timeout(base_url, credential, None, None)
     }
 
     pub fn with_base_url_and_max_tokens(
@@ -34,12 +35,27 @@ impl OpenAiProvider {
         credential: Option<&str>,
         max_tokens_override: Option<u32>,
     ) -> Self {
+        Self::with_base_url_and_max_tokens_and_timeout(
+            base_url,
+            credential,
+            max_tokens_override,
+            None,
+        )
+    }
+
+    pub fn with_base_url_and_max_tokens_and_timeout(
+        base_url: Option<&str>,
+        credential: Option<&str>,
+        max_tokens_override: Option<u32>,
+        timeout_secs: Option<u64>,
+    ) -> Self {
         Self {
             base_url: base_url
                 .map(|url| url.trim_end_matches('/').to_string())
                 .unwrap_or_else(|| "https://api.openai.com/v1".to_string()),
             credential: credential.map(ToString::to_string),
             max_tokens_override: max_tokens_override.filter(|value| *value > 0),
+            timeout_secs: timeout_secs.unwrap_or(120),
         }
     }
 }

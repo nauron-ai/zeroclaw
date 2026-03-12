@@ -7,10 +7,13 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 300;
+
 pub struct OllamaProvider {
     base_url: String,
     api_key: Option<String>,
     reasoning_enabled: Option<bool>,
+    timeout_secs: u64,
 }
 
 // ─── Request Structures ───────────────────────────────────────────────────────
@@ -110,13 +113,22 @@ impl OllamaProvider {
     }
 
     pub fn new(base_url: Option<&str>, api_key: Option<&str>) -> Self {
-        Self::new_with_reasoning(base_url, api_key, None)
+        Self::new_with_reasoning_and_timeout(base_url, api_key, None, None)
     }
 
     pub fn new_with_reasoning(
         base_url: Option<&str>,
         api_key: Option<&str>,
         reasoning_enabled: Option<bool>,
+    ) -> Self {
+        Self::new_with_reasoning_and_timeout(base_url, api_key, reasoning_enabled, None)
+    }
+
+    pub fn new_with_reasoning_and_timeout(
+        base_url: Option<&str>,
+        api_key: Option<&str>,
+        reasoning_enabled: Option<bool>,
+        timeout_secs: Option<u64>,
     ) -> Self {
         let api_key = api_key.and_then(|value| {
             let trimmed = value.trim();
@@ -127,6 +139,7 @@ impl OllamaProvider {
             base_url: Self::normalize_base_url(base_url.unwrap_or("http://localhost:11434")),
             api_key,
             reasoning_enabled,
+            timeout_secs: timeout_secs.unwrap_or(DEFAULT_PROVIDER_TIMEOUT_SECS),
         }
     }
 
@@ -138,7 +151,11 @@ impl OllamaProvider {
     }
 
     fn http_client(&self) -> Client {
-        crate::config::build_runtime_proxy_client_with_timeouts("provider.ollama", 300, 10)
+        crate::config::build_runtime_proxy_client_with_timeouts(
+            "provider.ollama",
+            self.timeout_secs,
+            10,
+        )
     }
 
     fn resolve_request_details(&self, model: &str) -> anyhow::Result<(String, bool)> {

@@ -7,9 +7,12 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 120;
+
 pub struct AnthropicProvider {
     credential: Option<String>,
     base_url: String,
+    timeout_secs: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -168,10 +171,18 @@ struct NativeContentIn {
 
 impl AnthropicProvider {
     pub fn new(credential: Option<&str>) -> Self {
-        Self::with_base_url(credential, None)
+        Self::with_base_url_and_timeout(credential, None, None)
     }
 
     pub fn with_base_url(credential: Option<&str>, base_url: Option<&str>) -> Self {
+        Self::with_base_url_and_timeout(credential, base_url, None)
+    }
+
+    pub fn with_base_url_and_timeout(
+        credential: Option<&str>,
+        base_url: Option<&str>,
+        timeout_secs: Option<u64>,
+    ) -> Self {
         let base_url = base_url
             .map(|u| u.trim_end_matches('/'))
             .unwrap_or("https://api.anthropic.com")
@@ -182,6 +193,7 @@ impl AnthropicProvider {
                 .filter(|k| !k.is_empty())
                 .map(ToString::to_string),
             base_url,
+            timeout_secs: timeout_secs.unwrap_or(DEFAULT_PROVIDER_TIMEOUT_SECS),
         }
     }
 
@@ -472,7 +484,11 @@ impl AnthropicProvider {
     }
 
     fn http_client(&self) -> Client {
-        crate::config::build_runtime_proxy_client_with_timeouts("provider.anthropic", 120, 10)
+        crate::config::build_runtime_proxy_client_with_timeouts(
+            "provider.anthropic",
+            self.timeout_secs,
+            10,
+        )
     }
 }
 
@@ -1313,6 +1329,7 @@ mod tests {
         let provider = AnthropicProvider {
             credential: Some("test-key".to_string()),
             base_url: format!("http://{addr}"),
+            timeout_secs: DEFAULT_PROVIDER_TIMEOUT_SECS,
         };
 
         // Multi-turn conversation: system → user (Go code) → assistant (code response) → user (follow-up)

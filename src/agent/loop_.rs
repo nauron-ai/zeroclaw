@@ -366,6 +366,10 @@ tokio::task_local! {
     static TOOL_LOOP_CANARY_TOKENS_ENABLED: bool;
 }
 
+tokio::task_local! {
+    static TOOL_LOOP_DEDUP_EXEMPT: Vec<String>;
+}
+
 const AUTO_CRON_DELIVERY_CHANNELS: &[&str] = &[
     "telegram",
     "discord",
@@ -459,6 +463,16 @@ where
     TOOL_LOOP_COST_ENFORCEMENT_CONTEXT
         .scope(context, future)
         .await
+}
+
+pub(crate) async fn scope_tool_call_dedup_exempt<F>(
+    dedup_exempt: Vec<String>,
+    future: F,
+) -> F::Output
+where
+    F: Future,
+{
+    TOOL_LOOP_DEDUP_EXEMPT.scope(dedup_exempt, future).await
 }
 
 fn should_inject_safety_heartbeat(counter: usize, interval: usize) -> bool {
@@ -1056,60 +1070,6 @@ pub(crate) async fn agent_turn(
         .await
 }
 
-/// Run the tool loop with channel reply_target context, used by channel runtimes
-/// to auto-populate delivery routing for scheduled reminders.
-#[allow(clippy::too_many_arguments)]
-pub(crate) async fn run_tool_call_loop_with_reply_target(
-    provider: &dyn Provider,
-    history: &mut Vec<ChatMessage>,
-    tools_registry: &[Box<dyn Tool>],
-    observer: &dyn Observer,
-    provider_name: &str,
-    model: &str,
-    temperature: f64,
-    silent: bool,
-    approval: Option<&ApprovalManager>,
-    channel_name: &str,
-    reply_target: Option<&str>,
-    multimodal_config: &crate::config::MultimodalConfig,
-    max_tool_iterations: usize,
-    cancellation_token: Option<CancellationToken>,
-    on_delta: Option<tokio::sync::mpsc::Sender<String>>,
-    hooks: Option<&crate::hooks::HookRunner>,
-    excluded_tools: &[String],
-    progress_mode: ProgressMode,
-) -> Result<String> {
-    TOOL_LOOP_PROGRESS_MODE
-        .scope(
-            progress_mode,
-            TOOL_LOOP_CANARY_TOKENS_ENABLED.scope(
-                false,
-                TOOL_LOOP_REPLY_TARGET.scope(
-                    reply_target.map(str::to_string),
-                    run_tool_call_loop(
-                        provider,
-                        history,
-                        tools_registry,
-                        observer,
-                        provider_name,
-                        model,
-                        temperature,
-                        silent,
-                        approval,
-                        channel_name,
-                        multimodal_config,
-                        max_tool_iterations,
-                        cancellation_token,
-                        on_delta,
-                        hooks,
-                        excluded_tools,
-                    ),
-                ),
-            ),
-        )
-        .await
-}
-
 /// Run the tool loop with optional non-CLI approval context scoped to this task.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn run_tool_call_loop_with_non_cli_approval_context(
@@ -1248,6 +1208,13 @@ pub async fn run_tool_call_loop(
         .try_with(Clone::clone)
         .ok()
         .flatten();
+    let dedup_exempt_tools: HashSet<String> = TOOL_LOOP_DEDUP_EXEMPT
+        .try_with(Clone::clone)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|name| name.trim().to_ascii_lowercase())
+        .filter(|name| !name.is_empty())
+        .collect();
     let progress_mode = TOOL_LOOP_PROGRESS_MODE
         .try_with(|mode| *mode)
         .unwrap_or(ProgressMode::Verbose);
@@ -2313,7 +2280,9 @@ pub async fn run_tool_call_loop(
             }
 
             let signature = tool_call_signature(&tool_name, &tool_args);
-            if !seen_tool_signatures.insert(signature) {
+            let tool_name_key = tool_name.trim().to_ascii_lowercase();
+            let dedup_exempt = dedup_exempt_tools.contains(tool_name_key.as_str());
+            if !dedup_exempt && !seen_tool_signatures.insert(signature) {
                 let duplicate = format!(
                     "Skipped duplicate tool call '{tool_name}' with identical arguments in this turn."
                 );
@@ -2790,19 +2759,7 @@ pub async fn run(
         Some(provider_name),
     );
 
-    let provider_runtime_options = providers::ProviderRuntimeOptions {
-        auth_profile_override: None,
-        provider_api_url: config.api_url.clone(),
-        provider_transport: config.effective_provider_transport(),
-        labaclaw_dir: config.config_path.parent().map(std::path::PathBuf::from),
-        secrets_encrypt: config.secrets.encrypt,
-        reasoning_enabled: config.runtime.reasoning_enabled,
-        reasoning_level: config.effective_provider_reasoning_level(),
-        custom_provider_api_mode: config.provider_api.map(|mode| mode.as_compatible_mode()),
-        custom_provider_auth_header: config.effective_custom_provider_auth_header(),
-        max_tokens_override: None,
-        model_support_vision: config.model_support_vision,
-    };
+    let provider_runtime_options = providers::runtime_options_from_config(&config);
 
     let provider: Box<dyn Provider> = providers::create_routed_provider_with_options(
         provider_name,
@@ -3058,23 +3015,26 @@ pub async fn run(
                     ld_cfg,
                     TOOL_LOOP_CANARY_TOKENS_ENABLED.scope(
                         config.security.canary_tokens,
-                        run_tool_call_loop(
-                            provider.as_ref(),
-                            &mut history,
-                            &tools_registry,
-                            observer.as_ref(),
-                            provider_name,
-                            &model_name,
-                            temperature,
-                            false,
-                            approval_manager.as_ref(),
-                            channel_name,
-                            &config.multimodal,
-                            config.agent.max_tool_iterations,
-                            None,
-                            None,
-                            effective_hooks,
-                            &[],
+                        scope_tool_call_dedup_exempt(
+                            config.agent.tool_call_dedup_exempt.clone(),
+                            run_tool_call_loop(
+                                provider.as_ref(),
+                                &mut history,
+                                &tools_registry,
+                                observer.as_ref(),
+                                provider_name,
+                                &model_name,
+                                temperature,
+                                false,
+                                approval_manager.as_ref(),
+                                channel_name,
+                                &config.multimodal,
+                                config.agent.max_tool_iterations,
+                                None,
+                                None,
+                                effective_hooks,
+                                &[],
+                            ),
                         ),
                     ),
                 ),
@@ -3287,23 +3247,26 @@ pub async fn run(
                         ld_cfg,
                         TOOL_LOOP_CANARY_TOKENS_ENABLED.scope(
                             config.security.canary_tokens,
-                            run_tool_call_loop(
-                                provider.as_ref(),
-                                &mut history,
-                                &tools_registry,
-                                observer.as_ref(),
-                                provider_name,
-                                &model_name,
-                                temperature,
-                                false,
-                                approval_manager.as_ref(),
-                                channel_name,
-                                &config.multimodal,
-                                config.agent.max_tool_iterations,
-                                None,
-                                None,
-                                effective_hooks,
-                                &[],
+                            scope_tool_call_dedup_exempt(
+                                config.agent.tool_call_dedup_exempt.clone(),
+                                run_tool_call_loop(
+                                    provider.as_ref(),
+                                    &mut history,
+                                    &tools_registry,
+                                    observer.as_ref(),
+                                    provider_name,
+                                    &model_name,
+                                    temperature,
+                                    false,
+                                    approval_manager.as_ref(),
+                                    channel_name,
+                                    &config.multimodal,
+                                    config.agent.max_tool_iterations,
+                                    None,
+                                    None,
+                                    effective_hooks,
+                                    &[],
+                                ),
                             ),
                         ),
                     ),
@@ -3497,19 +3460,7 @@ pub async fn process_message_with_session(
         config.default_model.as_deref(),
         Some(provider_name),
     );
-    let provider_runtime_options = providers::ProviderRuntimeOptions {
-        auth_profile_override: None,
-        provider_api_url: config.api_url.clone(),
-        provider_transport: config.effective_provider_transport(),
-        labaclaw_dir: config.config_path.parent().map(std::path::PathBuf::from),
-        secrets_encrypt: config.secrets.encrypt,
-        reasoning_enabled: config.runtime.reasoning_enabled,
-        reasoning_level: config.effective_provider_reasoning_level(),
-        custom_provider_api_mode: config.provider_api.map(|mode| mode.as_compatible_mode()),
-        custom_provider_auth_header: config.effective_custom_provider_auth_header(),
-        max_tokens_override: None,
-        model_support_vision: config.model_support_vision,
-    };
+    let provider_runtime_options = providers::runtime_options_from_config(&config);
     let provider: Box<dyn Provider> = providers::create_routed_provider_with_options(
         provider_name,
         config.api_key.as_deref(),
@@ -3654,17 +3605,20 @@ pub async fn process_message_with_session(
         cost_enforcement_context,
         SAFETY_HEARTBEAT_CONFIG.scope(
             hb_cfg,
-            agent_turn(
-                provider.as_ref(),
-                &mut history,
-                &tools_registry,
-                observer.as_ref(),
-                provider_name,
-                &model_name,
-                config.default_temperature,
-                true,
-                &config.multimodal,
-                config.agent.max_tool_iterations,
+            scope_tool_call_dedup_exempt(
+                config.agent.tool_call_dedup_exempt.clone(),
+                agent_turn(
+                    provider.as_ref(),
+                    &mut history,
+                    &tools_registry,
+                    observer.as_ref(),
+                    provider_name,
+                    &model_name,
+                    config.default_temperature,
+                    true,
+                    &config.multimodal,
+                    config.agent.max_tool_iterations,
+                ),
             ),
         ),
     )

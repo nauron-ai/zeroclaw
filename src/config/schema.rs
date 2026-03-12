@@ -25,6 +25,34 @@ fn default_config_temperature() -> f64 {
     0.7
 }
 
+const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 120;
+
+fn default_provider_timeout_secs() -> u64 {
+    DEFAULT_PROVIDER_TIMEOUT_SECS
+}
+
+pub(crate) fn provider_timeout_env_override() -> Option<u64> {
+    for key in [
+        "LABACLAW_PROVIDER_TIMEOUT_SECS",
+        "ZEROCLAW_PROVIDER_TIMEOUT_SECS",
+    ] {
+        let Ok(value) = std::env::var(key) else {
+            continue;
+        };
+        let Ok(timeout_secs) = value.trim().parse::<u64>() else {
+            continue;
+        };
+        if timeout_secs > 0 {
+            return Some(timeout_secs);
+        }
+    }
+    None
+}
+
+pub(crate) fn resolved_provider_timeout_secs() -> u64 {
+    provider_timeout_env_override().unwrap_or_else(default_provider_timeout_secs)
+}
+
 fn validate_config_temperature(value: f64) -> std::result::Result<f64, &'static str> {
     if (0.0..=2.0).contains(&value) {
         Ok(value)
@@ -271,6 +299,10 @@ pub struct Config {
     )]
     #[schemars(range(min = 0.0, max = 2.0))]
     pub default_temperature: f64,
+    /// HTTP request timeout in seconds for LLM provider API calls. Default: `120`.
+    #[serde(default = "default_provider_timeout_secs")]
+    #[schemars(range(min = 1))]
+    pub provider_timeout_secs: u64,
 
     /// Observability backend configuration (`[observability]`).
     #[serde(default)]
@@ -1105,6 +1137,10 @@ pub struct AgentConfig {
     /// Tool dispatch strategy (e.g. `"auto"`). Default: `"auto"`.
     #[serde(default = "default_agent_tool_dispatcher")]
     pub tool_dispatcher: String,
+    /// Tools exempt from the within-turn duplicate-call dedup check.
+    /// Exact tool names only; wildcard patterns are not supported.
+    #[serde(default)]
+    pub tool_call_dedup_exempt: Vec<String>,
     /// Optional allowlist for primary-agent tool visibility.
     /// When non-empty, only listed tools are exposed to the primary agent.
     #[serde(default)]
@@ -1248,6 +1284,7 @@ impl Default for AgentConfig {
             max_history_messages: default_agent_max_history_messages(),
             parallel_tools: false,
             tool_dispatcher: default_agent_tool_dispatcher(),
+            tool_call_dedup_exempt: Vec::new(),
             allowed_tools: Vec::new(),
             denied_tools: Vec::new(),
             teams: AgentTeamsConfig::default(),
@@ -2698,6 +2735,65 @@ impl ProxyConfig {
         builder
     }
 
+    pub fn apply_to_reqwest_blocking_builder(
+        &self,
+        mut builder: reqwest::blocking::ClientBuilder,
+        service_key: &str,
+    ) -> reqwest::blocking::ClientBuilder {
+        if !self.should_apply_to_service(service_key) {
+            return builder;
+        }
+
+        let no_proxy = self.no_proxy_value();
+
+        if let Some(url) = normalize_proxy_url_option(self.all_proxy.as_deref()) {
+            match reqwest::Proxy::all(&url) {
+                Ok(proxy) => {
+                    builder = builder.proxy(apply_no_proxy(proxy, no_proxy.clone()));
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        proxy_url = %url,
+                        service_key,
+                        "Ignoring invalid all_proxy URL: {error}"
+                    );
+                }
+            }
+        }
+
+        if let Some(url) = normalize_proxy_url_option(self.http_proxy.as_deref()) {
+            match reqwest::Proxy::http(&url) {
+                Ok(proxy) => {
+                    builder = builder.proxy(apply_no_proxy(proxy, no_proxy.clone()));
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        proxy_url = %url,
+                        service_key,
+                        "Ignoring invalid http_proxy URL: {error}"
+                    );
+                }
+            }
+        }
+
+        if let Some(url) = normalize_proxy_url_option(self.https_proxy.as_deref()) {
+            match reqwest::Proxy::https(&url) {
+                Ok(proxy) => {
+                    builder = builder.proxy(apply_no_proxy(proxy, no_proxy));
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        proxy_url = %url,
+                        service_key,
+                        "Ignoring invalid https_proxy URL: {error}"
+                    );
+                }
+            }
+        }
+
+        builder
+    }
+
     pub fn apply_to_process_env(&self) {
         set_proxy_env_pair("HTTP_PROXY", self.http_proxy.as_deref());
         set_proxy_env_pair("HTTPS_PROXY", self.https_proxy.as_deref());
@@ -2933,6 +3029,13 @@ pub fn apply_runtime_proxy_to_builder(
     runtime_proxy_config().apply_to_reqwest_builder(builder, service_key)
 }
 
+pub fn apply_runtime_proxy_to_blocking_builder(
+    builder: reqwest::blocking::ClientBuilder,
+    service_key: &str,
+) -> reqwest::blocking::ClientBuilder {
+    runtime_proxy_config().apply_to_reqwest_blocking_builder(builder, service_key)
+}
+
 pub fn build_runtime_proxy_client(service_key: &str) -> reqwest::Client {
     let cache_key = runtime_proxy_cache_key(service_key, None, None);
     if let Some(client) = runtime_proxy_cached_client(&cache_key) {
@@ -2972,6 +3075,24 @@ pub fn build_runtime_proxy_client_with_timeouts(
     });
     set_runtime_proxy_cached_client(cache_key, client.clone());
     client
+}
+
+pub fn build_runtime_proxy_blocking_client_with_timeouts(
+    service_key: &str,
+    timeout_secs: u64,
+    connect_timeout_secs: u64,
+) -> reqwest::blocking::Client {
+    let builder = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .connect_timeout(std::time::Duration::from_secs(connect_timeout_secs));
+    let builder = apply_runtime_proxy_to_blocking_builder(builder, service_key);
+    builder.build().unwrap_or_else(|error| {
+        tracing::warn!(
+            service_key,
+            "Failed to build proxied blocking timeout client: {error}"
+        );
+        reqwest::blocking::Client::new()
+    })
 }
 
 fn parse_proxy_scope(raw: &str) -> Option<ProxyScope> {
@@ -6655,6 +6776,7 @@ impl Default for Config {
             model_providers: HashMap::new(),
             provider: ProviderConfig::default(),
             default_temperature: 0.7,
+            provider_timeout_secs: default_provider_timeout_secs(),
             observability: ObservabilityConfig::default(),
             autonomy: AutonomyConfig::default(),
             security: SecurityConfig::default(),
@@ -8221,6 +8343,9 @@ impl Config {
         }
 
         validate_config_temperature(self.default_temperature).map_err(anyhow::Error::msg)?;
+        if self.provider_timeout_secs == 0 {
+            anyhow::bail!("provider_timeout_secs must be greater than 0");
+        }
 
         // Gateway
         if self.gateway.host.trim().is_empty() {
@@ -8493,6 +8618,25 @@ impl Config {
                 .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '*')
             {
                 anyhow::bail!("agent.denied_tools[{i}] contains invalid characters: {normalized}");
+            }
+        }
+        for (i, tool_name) in self.agent.tool_call_dedup_exempt.iter().enumerate() {
+            let normalized = tool_name.trim();
+            if normalized != tool_name {
+                anyhow::bail!(
+                    "agent.tool_call_dedup_exempt[{i}] must not include leading or trailing whitespace"
+                );
+            }
+            if normalized.is_empty() {
+                anyhow::bail!("agent.tool_call_dedup_exempt[{i}] must not be empty");
+            }
+            if !normalized
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+            {
+                anyhow::bail!(
+                    "agent.tool_call_dedup_exempt[{i}] contains invalid characters: {normalized}"
+                );
             }
         }
         let built_in_roles = ["owner", "admin", "operator", "viewer", "guest"];
@@ -9096,6 +9240,10 @@ impl Config {
         // Model: LABACLAW_MODEL or LABACLAW_MODEL or MODEL
         if let Some(model) = env_value_any(&["LABACLAW_MODEL", "MODEL"]) {
             self.default_model = Some(model);
+        }
+
+        if let Some(timeout_secs) = provider_timeout_env_override() {
+            self.provider_timeout_secs = timeout_secs;
         }
 
         // Apply named provider profile remapping (Codex app-server compatibility).
@@ -10517,6 +10665,7 @@ ws_url = "ws://127.0.0.1:3002"
             model_providers: HashMap::new(),
             provider: ProviderConfig::default(),
             default_temperature: 0.5,
+            provider_timeout_secs: 120,
             observability: ObservabilityConfig {
                 backend: "log".into(),
                 ..ObservabilityConfig::default()
@@ -10642,6 +10791,7 @@ ws_url = "ws://127.0.0.1:3002"
         assert_eq!(parsed.default_provider, config.default_provider);
         assert_eq!(parsed.default_model, config.default_model);
         assert!((parsed.default_temperature - config.default_temperature).abs() < f64::EPSILON);
+        assert_eq!(parsed.provider_timeout_secs, config.provider_timeout_secs);
         assert_eq!(parsed.observability.backend, "log");
         assert_eq!(parsed.observability.runtime_trace_mode, "none");
         assert_eq!(parsed.autonomy.level, AutonomyLevel::Full);
@@ -10979,6 +11129,7 @@ denied_tools = ["shell"]
             model_providers: HashMap::new(),
             provider: ProviderConfig::default(),
             default_temperature: 0.9,
+            provider_timeout_secs: 120,
             observability: ObservabilityConfig::default(),
             autonomy: AutonomyConfig::default(),
             security: SecurityConfig::default(),
@@ -11037,6 +11188,7 @@ denied_tools = ["shell"]
         assert_eq!(decrypted, "sk-roundtrip");
         assert_eq!(loaded.default_model.as_deref(), Some("test-model"));
         assert!((loaded.default_temperature - 0.9).abs() < f64::EPSILON);
+        assert_eq!(loaded.provider_timeout_secs, 120);
 
         let _ = fs::remove_dir_all(&dir).await;
     }
@@ -12469,6 +12621,39 @@ default_temperature = 0.7
             .contains("web_search.retries_per_provider"));
     }
 
+    #[test]
+    async fn config_validate_rejects_zero_provider_timeout() {
+        let mut config = Config::default();
+        config.provider_timeout_secs = 0;
+
+        let error = config
+            .validate()
+            .expect_err("expected provider_timeout_secs validation failure");
+        assert!(error.to_string().contains("provider_timeout_secs"));
+    }
+
+    #[test]
+    async fn config_validate_rejects_tool_call_dedup_exempt_whitespace() {
+        let mut config = Config::default();
+        config.agent.tool_call_dedup_exempt = vec![" shell ".to_string()];
+
+        let error = config
+            .validate()
+            .expect_err("expected tool_call_dedup_exempt whitespace validation failure");
+        assert!(error.to_string().contains("agent.tool_call_dedup_exempt"));
+    }
+
+    #[test]
+    async fn config_validate_rejects_tool_call_dedup_exempt_wildcard() {
+        let mut config = Config::default();
+        config.agent.tool_call_dedup_exempt = vec!["browser_*".to_string()];
+
+        let error = config
+            .validate()
+            .expect_err("expected tool_call_dedup_exempt wildcard validation failure");
+        assert!(error.to_string().contains("agent.tool_call_dedup_exempt"));
+    }
+
     // ── Environment variable overrides (Docker support) ─────────
 
     async fn env_override_lock() -> MutexGuard<'static, ()> {
@@ -12576,6 +12761,40 @@ default_temperature = 0.7
         assert_eq!(config.default_provider.as_deref(), Some("openai-codex"));
 
         std::env::remove_var("LABACLAW_MODEL_PROVIDER");
+    }
+
+    #[test]
+    async fn env_override_provider_timeout_prefers_labaclaw_then_zeroclaw() {
+        let _env_guard = env_override_lock().await;
+        let mut config = Config::default();
+        config.provider_timeout_secs = 120;
+
+        std::env::set_var("ZEROCLAW_PROVIDER_TIMEOUT_SECS", "90");
+        std::env::set_var("LABACLAW_PROVIDER_TIMEOUT_SECS", "45");
+        config.apply_env_overrides();
+        assert_eq!(config.provider_timeout_secs, 45);
+
+        std::env::remove_var("LABACLAW_PROVIDER_TIMEOUT_SECS");
+        config.provider_timeout_secs = 120;
+        config.apply_env_overrides();
+        assert_eq!(config.provider_timeout_secs, 90);
+
+        std::env::remove_var("ZEROCLAW_PROVIDER_TIMEOUT_SECS");
+    }
+
+    #[test]
+    async fn env_override_provider_timeout_ignores_invalid_labaclaw_value() {
+        let _env_guard = env_override_lock().await;
+        let mut config = Config::default();
+        config.provider_timeout_secs = 120;
+
+        std::env::set_var("LABACLAW_PROVIDER_TIMEOUT_SECS", "not-a-number");
+        std::env::set_var("ZEROCLAW_PROVIDER_TIMEOUT_SECS", "75");
+        config.apply_env_overrides();
+        assert_eq!(config.provider_timeout_secs, 75);
+
+        std::env::remove_var("LABACLAW_PROVIDER_TIMEOUT_SECS");
+        std::env::remove_var("ZEROCLAW_PROVIDER_TIMEOUT_SECS");
     }
 
     #[test]

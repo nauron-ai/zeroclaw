@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 120;
+
 /// Gemini provider supporting multiple authentication methods.
 pub struct GeminiProvider {
     auth: Option<GeminiAuth>,
@@ -27,6 +29,7 @@ pub struct GeminiProvider {
     auth_service: Option<AuthService>,
     /// Override profile name for managed auth.
     auth_profile_override: Option<String>,
+    timeout_secs: u64,
 }
 
 /// Mutable OAuth token state — supports runtime refresh for long-lived processes.
@@ -323,12 +326,13 @@ fn refresh_gemini_cli_token(
     refresh_token: &str,
     client_id: Option<&str>,
     client_secret: Option<&str>,
+    timeout_secs: u64,
 ) -> anyhow::Result<RefreshedToken> {
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .connect_timeout(std::time::Duration::from_secs(5))
-        .build()
-        .unwrap_or_else(|_| reqwest::blocking::Client::new());
+    let client = crate::config::build_runtime_proxy_blocking_client_with_timeouts(
+        "provider.gemini",
+        timeout_secs,
+        10,
+    );
 
     let form = build_oauth_refresh_form(refresh_token, client_id, client_secret);
 
@@ -427,6 +431,7 @@ async fn refresh_gemini_cli_token_async(
     refresh_token: &str,
     client_id: Option<&str>,
     client_secret: Option<&str>,
+    timeout_secs: u64,
 ) -> anyhow::Result<RefreshedToken> {
     let refresh_token = refresh_token.to_string();
     let client_id = client_id.map(str::to_string);
@@ -436,6 +441,7 @@ async fn refresh_gemini_cli_token_async(
             &refresh_token,
             client_id.as_deref(),
             client_secret.as_deref(),
+            timeout_secs,
         )
     })
     .await
@@ -451,6 +457,10 @@ impl GeminiProvider {
     /// 3. `GOOGLE_API_KEY` environment variable
     /// 4. Gemini CLI OAuth tokens (`~/.gemini/oauth_creds.json`)
     pub fn new(api_key: Option<&str>) -> Self {
+        Self::new_with_timeout(api_key, None)
+    }
+
+    pub fn new_with_timeout(api_key: Option<&str>, timeout_secs: Option<u64>) -> Self {
         let oauth_cred_paths = Self::discover_oauth_cred_paths();
         let resolved_auth = api_key
             .and_then(Self::normalize_non_empty)
@@ -469,6 +479,7 @@ impl GeminiProvider {
             oauth_index: Arc::new(tokio::sync::Mutex::new(0)),
             auth_service: None,
             auth_profile_override: None,
+            timeout_secs: timeout_secs.unwrap_or(DEFAULT_PROVIDER_TIMEOUT_SECS),
         }
     }
 
@@ -484,6 +495,15 @@ impl GeminiProvider {
         api_key: Option<&str>,
         auth_service: AuthService,
         profile_override: Option<String>,
+    ) -> Self {
+        Self::new_with_auth_and_timeout(api_key, auth_service, profile_override, None)
+    }
+
+    pub fn new_with_auth_and_timeout(
+        api_key: Option<&str>,
+        auth_service: AuthService,
+        profile_override: Option<String>,
+        timeout_secs: Option<u64>,
     ) -> Self {
         let oauth_cred_paths = Self::discover_oauth_cred_paths();
 
@@ -542,6 +562,7 @@ impl GeminiProvider {
                 None
             },
             auth_profile_override: profile_override,
+            timeout_secs: timeout_secs.unwrap_or(DEFAULT_PROVIDER_TIMEOUT_SECS),
         }
     }
 
@@ -698,6 +719,7 @@ impl GeminiProvider {
     /// Adds a 60-second buffer before actual expiry to avoid edge-case failures.
     async fn get_valid_oauth_token(
         state: &Arc<tokio::sync::Mutex<OAuthTokenState>>,
+        timeout_secs: u64,
     ) -> anyhow::Result<String> {
         let mut guard = state.lock().await;
 
@@ -718,6 +740,7 @@ impl GeminiProvider {
                     refresh_token,
                     guard.client_id.as_deref(),
                     guard.client_secret.as_deref(),
+                    timeout_secs,
                 )
                 .await?;
                 tracing::info!("Gemini CLI OAuth token refreshed successfully (runtime)");
@@ -816,7 +839,11 @@ impl GeminiProvider {
     }
 
     fn http_client(&self) -> Client {
-        crate::config::build_runtime_proxy_client_with_timeouts("provider.gemini", 120, 10)
+        crate::config::build_runtime_proxy_client_with_timeouts(
+            "provider.gemini",
+            self.timeout_secs,
+            10,
+        )
     }
 
     /// Resolve the GCP project ID for OAuth by calling the loadCodeAssist endpoint.
@@ -1034,7 +1061,7 @@ impl GeminiProvider {
         // For OAuth: get a valid (potentially refreshed) token and resolve project
         let (mut oauth_token, mut project) = match auth {
             GeminiAuth::OAuthToken(state) => {
-                let token = Self::get_valid_oauth_token(state).await?;
+                let token = Self::get_valid_oauth_token(state, self.timeout_secs).await?;
                 let proj = self.resolve_oauth_project(&token).await?;
                 (Some(token), Some(proj))
             }
@@ -1104,7 +1131,8 @@ impl GeminiProvider {
                     // Re-fetch token (may be refreshed)
                     let (new_token, new_project) = match auth {
                         GeminiAuth::OAuthToken(state) => {
-                            let token = Self::get_valid_oauth_token(state).await?;
+                            let token =
+                                Self::get_valid_oauth_token(state, self.timeout_secs).await?;
                             let proj = self.resolve_oauth_project(&token).await?;
                             (token, proj)
                         }
@@ -1428,6 +1456,7 @@ mod tests {
             oauth_index: Arc::new(tokio::sync::Mutex::new(0)),
             auth_service: None,
             auth_profile_override: None,
+            timeout_secs: DEFAULT_PROVIDER_TIMEOUT_SECS,
         }
     }
 
@@ -2269,6 +2298,7 @@ mod tests {
             oauth_index: Arc::new(tokio::sync::Mutex::new(0)),
             auth_service: None, // Missing auth_service
             auth_profile_override: None,
+            timeout_secs: DEFAULT_PROVIDER_TIMEOUT_SECS,
         };
 
         let result = provider.warmup().await;
