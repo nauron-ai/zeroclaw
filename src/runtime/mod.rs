@@ -1,9 +1,11 @@
 pub mod docker;
+pub mod docker_agent;
 pub mod native;
 pub mod traits;
 pub mod wasm;
 
 pub use docker::DockerRuntime;
+pub use docker_agent::{AgentWorkspaceMount, DockerAgentSpawnRequest, DockerAgentSpawner};
 pub use native::NativeRuntime;
 pub use traits::RuntimeAdapter;
 pub use wasm::{WasmCapabilities, WasmRuntime};

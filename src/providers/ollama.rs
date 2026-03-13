@@ -269,6 +269,90 @@ impl OllamaProvider {
             .to_string()
     }
 
+    fn openai_tools_to_tool_specs(tools: &[serde_json::Value]) -> Vec<crate::tools::ToolSpec> {
+        tools
+            .iter()
+            .filter_map(|tool| {
+                let function = tool.get("function")?;
+                let name = function.get("name")?.as_str()?.trim();
+                if name.is_empty() {
+                    return None;
+                }
+
+                let description = function
+                    .get("description")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("No description provided")
+                    .to_string();
+                let parameters = function.get("parameters").cloned().unwrap_or_else(|| {
+                    serde_json::json!({
+                        "type": "object",
+                        "properties": {}
+                    })
+                });
+
+                Some(crate::tools::ToolSpec {
+                    name: name.to_string(),
+                    description,
+                    parameters,
+                })
+            })
+            .collect()
+    }
+
+    fn with_prompt_guided_tool_instructions(
+        messages: &[ChatMessage],
+        tools: Option<&[crate::tools::ToolSpec]>,
+    ) -> Vec<ChatMessage> {
+        let Some(tools) = tools else {
+            return messages.to_vec();
+        };
+
+        if tools.is_empty() {
+            return messages.to_vec();
+        }
+
+        let instructions = crate::providers::traits::build_tool_instructions_text(tools);
+        let mut modified_messages = messages.to_vec();
+
+        if let Some(system_message) = modified_messages.iter_mut().find(|m| m.role == "system") {
+            if !system_message.content.is_empty() {
+                system_message.content.push_str("\n\n");
+            }
+            system_message.content.push_str(&instructions);
+        } else {
+            modified_messages.insert(0, ChatMessage::system(instructions));
+        }
+
+        modified_messages
+    }
+
+    async fn prompt_guided_tools_fallback(
+        &self,
+        messages: &[ChatMessage],
+        tools: &[serde_json::Value],
+        model: &str,
+        temperature: f64,
+    ) -> anyhow::Result<ChatResponse> {
+        let tool_specs = Self::openai_tools_to_tool_specs(tools);
+        let fallback_messages = Self::with_prompt_guided_tool_instructions(
+            messages,
+            (!tool_specs.is_empty()).then_some(tool_specs.as_slice()),
+        );
+        let text = self
+            .chat_with_history(&fallback_messages, model, temperature)
+            .await?;
+        Ok(ChatResponse {
+            text: Some(text),
+            tool_calls: vec![],
+            usage: None,
+            reasoning_content: None,
+            quota_metadata: None,
+            stop_reason: None,
+            raw_stop_reason: None,
+        })
+    }
+
     fn build_chat_request(
         &self,
         messages: Vec<Message>,
@@ -679,7 +763,7 @@ impl Provider for OllamaProvider {
         // tools_to_openai_format() in loop_.rs — pass them through directly.
         let tools_opt = if tools.is_empty() { None } else { Some(tools) };
 
-        let response = self
+        let response = match self
             .send_request(
                 api_messages,
                 &normalized_model,
@@ -687,7 +771,24 @@ impl Provider for OllamaProvider {
                 should_auth,
                 tools_opt,
             )
-            .await?;
+            .await
+        {
+            Ok(response) => response,
+            Err(error) => {
+                if !tools.is_empty()
+                    && crate::providers::has_native_tool_schema_rejection_hint(&error.to_string())
+                {
+                    tracing::warn!(
+                        "Ollama model '{}' rejected native tools; retrying with prompt-guided tool instructions",
+                        normalized_model
+                    );
+                    return self
+                        .prompt_guided_tools_fallback(messages, tools, &normalized_model, temperature)
+                        .await;
+                }
+                return Err(error);
+            }
+        };
 
         let usage = if response.prompt_eval_count.is_some() || response.eval_count.is_some() {
             Some(TokenUsage {
@@ -812,6 +913,43 @@ impl Provider for OllamaProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{extract::State, routing::post, Json, Router};
+    use serde_json::Value;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    #[derive(Clone, Default)]
+    struct ToolFallbackState {
+        requests: Arc<Mutex<Vec<Value>>>,
+    }
+
+    async fn ollama_chat_endpoint(
+        State(state): State<ToolFallbackState>,
+        Json(payload): Json<Value>,
+    ) -> (axum::http::StatusCode, Json<Value>) {
+        state.requests.lock().await.push(payload.clone());
+
+        if payload.get("tools").is_some() {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "registry.ollama.ai/library/llama3:latest does not support tools"
+                })),
+            );
+        }
+
+        (
+            axum::http::StatusCode::OK,
+            Json(serde_json::json!({
+                "message": {
+                    "role": "assistant",
+                    "content": "RESULT FOR ORCHESTRATOR: margin is 30%. FINANCE-SMOKE-OK"
+                },
+                "prompt_eval_count": 12,
+                "eval_count": 8
+            })),
+        )
+    }
 
     #[test]
     fn default_url() {
@@ -1155,6 +1293,83 @@ mod tests {
         let caps = <OllamaProvider as Provider>::capabilities(&provider);
         assert!(caps.native_tool_calling);
         assert!(caps.vision);
+    }
+
+    #[tokio::test]
+    async fn chat_with_tools_falls_back_to_prompt_guided_mode_when_model_rejects_native_tools() {
+        let state = ToolFallbackState::default();
+        let app = Router::new()
+            .route("/api/chat", post(ollama_chat_endpoint))
+            .with_state(state.clone());
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test server");
+        let addr = listener.local_addr().expect("local addr");
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app).await.expect("serve test app");
+        });
+
+        let provider = OllamaProvider::new(Some(&format!("http://{addr}")), None);
+        let messages = vec![ChatMessage::user(
+            "Compute the margin from Revenue=1000 and Costs=700.",
+        )];
+        let tools = vec![serde_json::json!({
+            "type": "function",
+            "function": {
+                "name": "file_read",
+                "description": "Read a file from the mounted workspace.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": { "type": "string" }
+                    },
+                    "required": ["path"]
+                }
+            }
+        })];
+
+        let response = provider
+            .chat_with_tools(&messages, &tools, "llama3:latest", 0.2)
+            .await
+            .expect("prompt-guided fallback should succeed");
+
+        assert_eq!(
+            response.text.as_deref(),
+            Some("RESULT FOR ORCHESTRATOR: margin is 30%. FINANCE-SMOKE-OK")
+        );
+        assert!(
+            response.tool_calls.is_empty(),
+            "prompt-guided fallback should return plain text when no tool call is needed"
+        );
+
+        let requests = state.requests.lock().await;
+        assert_eq!(requests.len(), 2, "expected native attempt plus fallback");
+        assert!(
+            requests[0].get("tools").is_some(),
+            "first request must try native tools"
+        );
+        assert!(
+            requests[1].get("tools").is_none(),
+            "fallback request must omit native tools"
+        );
+        let fallback_messages = requests[1]
+            .get("messages")
+            .and_then(Value::as_array)
+            .expect("fallback request should include messages");
+        let fallback_system = fallback_messages
+            .iter()
+            .find(|message| message.get("role").and_then(Value::as_str) == Some("system"))
+            .expect("fallback should inject a system instruction");
+        let fallback_system_text = fallback_system
+            .get("content")
+            .and_then(Value::as_str)
+            .expect("fallback system content should be plain text");
+        assert!(fallback_system_text.contains("Available Tools"));
+        assert!(fallback_system_text.contains("file_read"));
+
+        server.abort();
+        let _ = server.await;
     }
 
     #[test]

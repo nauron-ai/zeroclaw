@@ -108,12 +108,14 @@ pub mod runtime;
 pub(crate) mod security;
 pub(crate) mod service;
 pub(crate) mod skills;
+pub mod spawned_runtime;
 #[cfg(test)]
 pub(crate) mod test_locks;
 pub mod tools;
 pub(crate) mod tunnel;
 pub mod update;
 pub(crate) mod util;
+pub mod worker_plane;
 
 pub use config::Config;
 

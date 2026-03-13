@@ -72,6 +72,10 @@ pub mod schedule;
 pub mod schema;
 pub mod screenshot;
 pub mod shell;
+pub mod spawn_agent;
+pub mod spawned_agent_list;
+pub mod spawned_agent_manage;
+pub mod spawned_agent_registry;
 pub mod subagent_list;
 pub mod subagent_manage;
 pub mod subagent_registry;
@@ -140,6 +144,10 @@ pub use schedule::ScheduleTool;
 pub use schema::{CleaningStrategy, SchemaCleanr};
 pub use screenshot::ScreenshotTool;
 pub use shell::ShellTool;
+pub use spawn_agent::SpawnAgentTool;
+pub use spawned_agent_list::SpawnedAgentListTool;
+pub use spawned_agent_manage::SpawnedAgentManageTool;
+pub use spawned_agent_registry::SpawnedAgentRegistry;
 pub use subagent_list::SubAgentListTool;
 pub use subagent_manage::SubAgentManageTool;
 pub use subagent_registry::SubAgentRegistry;
@@ -717,6 +725,31 @@ pub fn all_tools_with_runtime(
         tool_arcs.push(Arc::new(SubAgentManageTool::new(
             subagent_registry,
             security.clone(),
+        )));
+    }
+
+    if runtime.has_shell_access() {
+        let spawned_agent_registry = Arc::new(SpawnedAgentRegistry::new());
+        let agent_spawner =
+            crate::runtime::DockerAgentSpawner::new(root_config.runtime.docker.clone());
+        tool_arcs.push(Arc::new(SpawnAgentTool::new(
+            Arc::new(root_config.clone()),
+            security.clone(),
+            spawned_agent_registry.clone(),
+            labaclaw_dir.clone(),
+            agent_spawner.clone(),
+        )));
+        tool_arcs.push(Arc::new(SpawnedAgentListTool::new(
+            spawned_agent_registry.clone(),
+            agent_spawner.clone(),
+            labaclaw_dir.clone(),
+        )));
+        tool_arcs.push(Arc::new(SpawnedAgentManageTool::new(
+            spawned_agent_registry,
+            security.clone(),
+            agent_spawner,
+            labaclaw_dir.clone(),
+            Arc::new(root_config.clone()),
         )));
     }
 

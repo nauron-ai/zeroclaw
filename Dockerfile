@@ -23,6 +23,7 @@ COPY crates/zeroclaw-types/Cargo.toml crates/zeroclaw-types/Cargo.toml
 COPY crates/zeroclaw-core/Cargo.toml crates/zeroclaw-core/Cargo.toml
 # Create dummy targets declared in Cargo.toml so manifest parsing succeeds.
 RUN mkdir -p src benches crates/robot-kit/src crates/zeroclaw-types/src crates/zeroclaw-core/src \
+    && echo "pub fn placeholder() {}" > src/lib.rs \
     && echo "fn main() {}" > src/main.rs \
     && echo "fn main() {}" > benches/agent_benchmarks.rs \
     && echo "pub fn placeholder() {}" > crates/robot-kit/src/lib.rs \
@@ -32,11 +33,11 @@ RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/regist
     --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
     if [ "$ZEROCLAW_CARGO_ALL_FEATURES" = "true" ]; then \
-      cargo build --release --locked --all-features; \
+      cargo build --release --locked --all-features --bin labaclaw; \
     elif [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
-      cargo build --release --locked --features "$ZEROCLAW_CARGO_FEATURES"; \
+      cargo build --release --locked --features "$ZEROCLAW_CARGO_FEATURES" --bin labaclaw; \
     else \
-      cargo build --release --locked; \
+      cargo build --release --locked --bin labaclaw; \
     fi
 RUN rm -rf src benches crates/robot-kit/src crates/zeroclaw-types/src crates/zeroclaw-core/src
 
@@ -44,19 +45,20 @@ RUN rm -rf src benches crates/robot-kit/src crates/zeroclaw-types/src crates/zer
 COPY src/ src/
 COPY benches/ benches/
 COPY crates/ crates/
+COPY data/ data/
 COPY firmware/ firmware/
 COPY templates/ templates/
 RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
+    export CARGO_TARGET_DIR=/app/target-final && \
     if [ "$ZEROCLAW_CARGO_ALL_FEATURES" = "true" ]; then \
-      cargo build --release --locked --all-features; \
+      cargo build --release --locked --all-features --bin labaclaw; \
     elif [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
-      cargo build --release --locked --features "$ZEROCLAW_CARGO_FEATURES"; \
+      cargo build --release --locked --features "$ZEROCLAW_CARGO_FEATURES" --bin labaclaw; \
     else \
-      cargo build --release --locked; \
+      cargo build --release --locked --bin labaclaw; \
     fi && \
-    cp target/release/labaclaw /app/labaclaw && \
+    cp /app/target-final/release/labaclaw /app/labaclaw && \
     strip /app/labaclaw
 
 # Prepare runtime directory structure and default config inline (no extra stage)

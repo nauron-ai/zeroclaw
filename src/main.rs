@@ -125,12 +125,14 @@ mod security;
 mod service;
 mod skillforge;
 mod skills;
+mod spawned_runtime;
 #[cfg(test)]
 mod test_locks;
 mod tools;
 mod tunnel;
 mod update;
 mod util;
+mod worker_plane;
 
 use config::Config;
 
@@ -289,6 +291,14 @@ Examples:
         /// Memory backend (sqlite, sqlite_qdrant_hybrid, postgres_qdrant_hybrid, lucid, cortex-mem, postgres, qdrant, markdown, none)
         #[arg(long)]
         memory_backend: Option<String>,
+    },
+
+    /// Start the internal spawned-agent runtime inside a dedicated container
+    #[command(hide = true)]
+    AgentRuntime {
+        /// Polling interval for control-plane files in milliseconds
+        #[arg(long, default_value_t = 1000)]
+        poll_interval_ms: u64,
     },
 
     /// Start the gateway server (webhooks, websockets)
@@ -1084,6 +1094,10 @@ async fn main() -> Result<()> {
             ))
             .await
             .map(|_| ())
+        }
+
+        Commands::AgentRuntime { poll_interval_ms } => {
+            spawned_runtime::run(config, poll_interval_ms).await
         }
 
         Commands::Gateway {

@@ -1072,6 +1072,17 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
     None
 }
 
+/// Resolve a provider credential into a concrete value for internal runtime use.
+///
+/// This is intended for internal subsystems that need to materialize child
+/// configurations from the orchestrator's credential inventory.
+pub(crate) fn resolve_provider_credential_for_runtime(
+    name: &str,
+    credential_override: Option<&str>,
+) -> Option<String> {
+    resolve_provider_credential(name, credential_override)
+}
+
 /// Check whether a provider credential can be resolved from override/env fallbacks.
 ///
 /// This mirrors provider credential resolution while avoiding exposing the
