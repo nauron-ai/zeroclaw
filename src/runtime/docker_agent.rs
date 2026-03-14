@@ -3,8 +3,10 @@ use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 use tokio::process::Command;
+use tokio::time::{timeout, Duration};
 
 const DEFAULT_CONTAINER_CONFIG_DIR: &str = "/agent";
+const DOCKER_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentWorkspaceMount {
@@ -126,12 +128,19 @@ impl DockerAgentSpawner {
             return Ok(resolved);
         }
 
-        let allowed = self.config.allowed_workspace_roots.iter().any(|root| {
-            let root_path = Path::new(root)
-                .canonicalize()
-                .unwrap_or_else(|_| PathBuf::from(root));
-            resolved.starts_with(root_path)
-        });
+        let mut allowed = false;
+        for root in &self.config.allowed_workspace_roots {
+            let root_path = Path::new(root).canonicalize().with_context(|| {
+                format!(
+                    "Failed to resolve runtime.docker.allowed_workspace_roots entry {}",
+                    root
+                )
+            })?;
+            if resolved.starts_with(&root_path) {
+                allowed = true;
+                break;
+            }
+        }
 
         if !allowed {
             anyhow::bail!(
@@ -149,12 +158,16 @@ impl DockerAgentSpawner {
 
     pub fn build_spawn_command(&self, request: &DockerAgentSpawnRequest) -> Result<Command> {
         let mut process = Command::new("docker");
+        let container_name = request.container_name.trim();
+        if container_name.is_empty() {
+            anyhow::bail!("spawned agent container_name must not be empty");
+        }
         process
             .arg("run")
             .arg("--detach")
             .arg("--init")
             .arg("--name")
-            .arg(request.container_name.trim());
+            .arg(container_name);
 
         let image = request.image.trim();
         if image.is_empty() {
@@ -243,12 +256,29 @@ impl DockerAgentSpawner {
         Ok(process)
     }
 
-    pub async fn spawn_service(&self, request: &DockerAgentSpawnRequest) -> Result<String> {
-        let output = self
-            .build_spawn_command(request)?
-            .output()
+    async fn run_docker_output(
+        &self,
+        mut command: Command,
+        description: &str,
+    ) -> Result<std::process::Output> {
+        command.kill_on_drop(true);
+        timeout(DOCKER_COMMAND_TIMEOUT, command.output())
             .await
-            .context("Failed to execute docker run for spawned agent")?;
+            .with_context(|| {
+                format!(
+                    "Timed out after {}s while {}",
+                    DOCKER_COMMAND_TIMEOUT.as_secs(),
+                    description
+                )
+            })?
+            .with_context(|| format!("Failed to {description}"))
+    }
+
+    pub async fn spawn_service(&self, request: &DockerAgentSpawnRequest) -> Result<String> {
+        let command = self.build_spawn_command(request)?;
+        let output = self
+            .run_docker_output(command, "execute docker run for spawned agent")
+            .await?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -266,14 +296,15 @@ impl DockerAgentSpawner {
         &self,
         container_name: &str,
     ) -> Result<Option<DockerAgentServiceStatus>> {
-        let output = Command::new("docker")
+        let mut command = Command::new("docker");
+        command
             .arg("inspect")
             .arg("--format")
             .arg("{{.Id}}|{{.State.Status}}")
-            .arg(container_name)
-            .output()
-            .await
-            .context("Failed to inspect spawned agent container")?;
+            .arg(container_name);
+        let output = self
+            .run_docker_output(command, "inspect spawned agent container")
+            .await?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -320,11 +351,11 @@ impl DockerAgentSpawner {
     }
 
     async fn run_simple_docker_command(&self, args: &[&str], action: &str) -> Result<()> {
-        let output = Command::new("docker")
-            .args(args)
-            .output()
-            .await
-            .with_context(|| format!("Failed to execute docker {action} command"))?;
+        let mut command = Command::new("docker");
+        command.args(args);
+        let output = self
+            .run_docker_output(command, &format!("execute docker {action} command"))
+            .await?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -455,6 +486,54 @@ mod tests {
         let message = error.to_string();
         assert!(message.contains("Failed to validate workspace mount"));
         assert!(message.contains(&std::env::temp_dir().display().to_string()));
+    }
+
+    #[test]
+    fn spawn_builder_rejects_empty_container_name() {
+        let spawner = test_spawner();
+        let request = DockerAgentSpawnRequest {
+            container_name: "   ".into(),
+            image: "ghcr.io/nauron-ai/labaclaw:dev".into(),
+            host_config_dir: std::env::temp_dir(),
+            container_config_dir: "/agent".into(),
+            workspace_mounts: Vec::new(),
+            env: HashMap::new(),
+            labels: HashMap::new(),
+        };
+
+        let error = spawner
+            .build_spawn_command(&request)
+            .expect_err("empty container name must be rejected");
+        assert!(error
+            .to_string()
+            .contains("spawned agent container_name must not be empty"));
+    }
+
+    #[test]
+    fn spawn_builder_rejects_invalid_allowed_workspace_root() {
+        let spawner = DockerAgentSpawner::new(DockerRuntimeConfig {
+            allowed_workspace_roots: vec!["./definitely-missing-root".into()],
+            ..test_spawner().config
+        });
+        let request = DockerAgentSpawnRequest {
+            container_name: "agent-bad-root".into(),
+            image: "ghcr.io/nauron-ai/labaclaw:dev".into(),
+            host_config_dir: std::env::temp_dir(),
+            container_config_dir: "/agent".into(),
+            workspace_mounts: vec![AgentWorkspaceMount {
+                host_path: std::env::temp_dir(),
+                container_path: "/workspace".into(),
+                read_only: true,
+            }],
+            env: HashMap::new(),
+            labels: HashMap::new(),
+        };
+
+        let error = spawner
+            .build_spawn_command(&request)
+            .expect_err("invalid allowed root must be rejected");
+        let message = format!("{error:#}");
+        assert!(message.contains("Failed to resolve runtime.docker.allowed_workspace_roots entry"));
     }
 
     #[test]
