@@ -383,10 +383,10 @@ impl SpawnedAgentManageTool {
         &self,
         agent_id: &str,
     ) -> anyhow::Result<Option<SpawnedAgentStatusSnapshot>> {
-        if let Some(snapshot) = self.registry.get_status(agent_id) {
+        if let Some(snapshot) = discover_status_snapshot(&self.labaclaw_dir, agent_id)? {
             return Ok(Some(snapshot));
         }
-        discover_status_snapshot(&self.labaclaw_dir, agent_id)
+        Ok(self.registry.get_status(agent_id))
     }
 
     async fn load_distributed_plan(

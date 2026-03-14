@@ -1,3 +1,5 @@
+pub mod projection;
+
 use crate::config::WorkerPlaneConfig;
 use anyhow::{Context, Result};
 use chrono::Utc;

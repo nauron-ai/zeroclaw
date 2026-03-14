@@ -153,6 +153,21 @@ pub async fn run(config: Config, host: String, port: u16) -> Result<()> {
         tracing::info!("Cron disabled; scheduler supervisor not started");
     }
 
+    if crate::worker_plane::worker_plane_enabled(&config.worker_plane) {
+        let projection_cfg = config.clone();
+        handles.push(spawn_component_supervisor(
+            "worker-plane-projections",
+            initial_backoff,
+            max_backoff,
+            move || {
+                let cfg = projection_cfg.clone();
+                async move { crate::worker_plane::projection::run_projection_loop(cfg).await }
+            },
+        ));
+    } else {
+        crate::health::mark_component_ok("worker-plane-projections");
+    }
+
     println!("🧠 LabaClaw daemon started");
     println!("   Gateway:  http://{host}:{port}");
     println!("   Components: gateway, channels, heartbeat, scheduler");
