@@ -115,19 +115,25 @@ impl SpawnedAgentManageTool {
             });
         };
 
-        let docker_state = self
-            .spawner
-            .inspect_service(&snapshot.container_name)
-            .await?;
-        if let Some(state) = &docker_state {
-            snapshot.container_id = Some(state.container_id.clone());
-            snapshot.service_state = match state.state.as_str() {
-                "running" => SpawnedAgentServiceState::Running,
-                "exited" | "dead" => SpawnedAgentServiceState::Terminated,
-                "paused" => SpawnedAgentServiceState::Suspended,
-                _ => snapshot.service_state.clone(),
-            };
-        }
+        let distributed_plan = self.load_distributed_plan(&snapshot).await?;
+        let docker_state = if distributed_plan.is_some() {
+            None
+        } else {
+            let docker_state = self
+                .spawner
+                .inspect_service(&snapshot.container_name)
+                .await?;
+            if let Some(state) = &docker_state {
+                snapshot.container_id = Some(state.container_id.clone());
+                snapshot.service_state = match state.state.as_str() {
+                    "running" => SpawnedAgentServiceState::Running,
+                    "exited" | "dead" => SpawnedAgentServiceState::Terminated,
+                    "paused" => SpawnedAgentServiceState::Suspended,
+                    _ => snapshot.service_state.clone(),
+                };
+            }
+            docker_state
+        };
         let runtime_state = if snapshot.runtime_state_path.exists() {
             Some(
                 serde_json::from_slice::<serde_json::Value>(
@@ -138,17 +144,10 @@ impl SpawnedAgentManageTool {
         } else {
             None
         };
-        let distributed_plan_path = distributed_spawn_plan_path(&snapshot.config_dir);
-        let distributed_plan = if distributed_plan_path.exists() {
-            Some(
-                serde_json::from_slice::<serde_json::Value>(
-                    &tokio::fs::read(&distributed_plan_path).await?,
-                )
-                .unwrap_or_else(|_| json!({"error": "Failed to parse spawn-plan.json"})),
-            )
-        } else {
-            None
-        };
+        let distributed_plan = distributed_plan.map(|plan| {
+            serde_json::to_value(plan)
+                .unwrap_or_else(|_| json!({"error": "Failed to serialize spawn-plan.json"}))
+        });
 
         let mut output = json!({
             "agent_id": snapshot.agent_id,
