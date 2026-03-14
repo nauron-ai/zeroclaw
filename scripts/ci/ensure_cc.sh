@@ -86,13 +86,13 @@ run_as_privileged() {
 install_cc_toolchain() {
     if command -v apt-get >/dev/null 2>&1; then
         run_as_privileged apt-get update
-        run_as_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential binutils pkg-config
+        run_as_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential binutils pkg-config libcurl4-openssl-dev
     elif command -v yum >/dev/null 2>&1; then
-        run_as_privileged yum install -y gcc gcc-c++ binutils make pkgconfig
+        run_as_privileged yum install -y gcc gcc-c++ binutils make pkgconfig libcurl-devel
     elif command -v dnf >/dev/null 2>&1; then
-        run_as_privileged dnf install -y gcc gcc-c++ binutils make pkgconf-pkg-config
+        run_as_privileged dnf install -y gcc gcc-c++ binutils make pkgconf-pkg-config libcurl-devel
     elif command -v apk >/dev/null 2>&1; then
-        run_as_privileged apk add --no-cache build-base pkgconf
+        run_as_privileged apk add --no-cache build-base pkgconf curl-dev
     else
         return 1
     fi
