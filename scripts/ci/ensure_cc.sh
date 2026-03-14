@@ -83,6 +83,44 @@ run_as_privileged() {
     return 1
 }
 
+libcurl_headers_ready() {
+    if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libcurl; then
+        return 0
+    fi
+
+    for header in \
+        /usr/include/curl/curl.h \
+        /usr/include/x86_64-linux-gnu/curl/curl.h \
+        /usr/local/include/curl/curl.h \
+        /opt/homebrew/include/curl/curl.h; do
+        if [ -f "${header}" ]; then
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+install_native_build_deps() {
+    if libcurl_headers_ready; then
+        return 0
+    fi
+
+    echo "::warning::Missing libcurl development headers. Attempting package-manager install."
+    if command -v apt-get >/dev/null 2>&1; then
+        run_as_privileged apt-get update
+        run_as_privileged env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libcurl4-openssl-dev
+    elif command -v yum >/dev/null 2>&1; then
+        run_as_privileged yum install -y libcurl-devel
+    elif command -v dnf >/dev/null 2>&1; then
+        run_as_privileged dnf install -y libcurl-devel
+    elif command -v apk >/dev/null 2>&1; then
+        run_as_privileged apk add --no-cache curl-dev
+    else
+        return 1
+    fi
+}
+
 install_cc_toolchain() {
     if command -v apt-get >/dev/null 2>&1; then
         run_as_privileged apt-get update
@@ -173,14 +211,17 @@ EOF
 }
 
 if command -v cc >/dev/null 2>&1; then
+    install_native_build_deps || true
     finish_if_ready
 fi
 
 if shim_cc_to_compiler clang; then
+    install_native_build_deps || true
     finish_if_ready
 fi
 
 if shim_cc_to_compiler gcc; then
+    install_native_build_deps || true
     finish_if_ready
 fi
 
@@ -190,6 +231,7 @@ if ! install_cc_toolchain; then
 fi
 
 if command -v cc >/dev/null 2>&1; then
+    install_native_build_deps || true
     finish_if_ready
 fi
 
@@ -198,10 +240,12 @@ if install_zig_cc_shim; then
 fi
 
 if shim_cc_to_compiler clang; then
+    install_native_build_deps || true
     finish_if_ready
 fi
 
 if shim_cc_to_compiler gcc; then
+    install_native_build_deps || true
     finish_if_ready
 fi
 
