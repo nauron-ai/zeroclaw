@@ -341,7 +341,6 @@ pub async fn publish_json_message(
         .with_context(|| {
             format!("Timed out publishing {message_type} for agent {agent_id} to topic {topic}")
         })?
-        .await
         .map_err(|(error, _message)| error)
         .with_context(|| {
             format!("Failed to publish {message_type} for agent {agent_id} to topic {topic}")
