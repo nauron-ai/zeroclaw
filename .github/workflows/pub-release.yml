@@ -42,6 +42,7 @@ env:
     CARGO_TERM_COLOR: always
     RELEASE_TARGET: x86_64-unknown-linux-gnu
     RELEASE_ARCHIVE: labaclaw-x86_64-unknown-linux-gnu.tar.gz
+    RELEASE_FEATURES: worker-plane-distributed
 
 jobs:
     prepare:
@@ -113,6 +114,7 @@ jobs:
                     echo "- draft_release: ${{ steps.vars.outputs.draft_release }}"
                     echo "- prerelease_release: ${{ steps.vars.outputs.prerelease_release }}"
                     echo "- target: ${RELEASE_TARGET}"
+                    echo "- features: ${RELEASE_FEATURES}"
                   } >> "$GITHUB_STEP_SUMMARY"
 
     build-release:
@@ -158,7 +160,7 @@ jobs:
 
             - name: Build release
               shell: bash
-              run: cargo build --profile release-fast --locked --target "${RELEASE_TARGET}" --package labaclaw --bin labaclaw
+              run: cargo build --profile release-fast --locked --target "${RELEASE_TARGET}" --package labaclaw --bin labaclaw --features "${RELEASE_FEATURES}"
 
             - name: Verify binary format
               shell: bash
