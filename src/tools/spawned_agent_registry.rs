@@ -230,6 +230,7 @@ pub struct SpawnedAgentSummary {
     pub lifecycle_mode: String,
     pub primary_provider: String,
     pub primary_model: String,
+    pub container_id: Option<String>,
     pub service_state: String,
     pub task_state: String,
     pub started_at: String,
@@ -246,6 +247,7 @@ impl SpawnedAgentSummary {
             lifecycle_mode: session.lifecycle_mode.clone(),
             primary_provider: session.primary_provider.clone(),
             primary_model: session.primary_model.clone(),
+            container_id: session.container_id.clone(),
             service_state: session.service_state.as_str().to_string(),
             task_state: session.task_state.as_str().to_string(),
             started_at: session.started_at.to_rfc3339(),
@@ -315,7 +317,8 @@ pub fn discover_status_snapshot(
     labaclaw_dir: &Path,
     agent_id: &str,
 ) -> Result<Option<SpawnedAgentStatusSnapshot>> {
-    let agent_home = spawned_agents_dir(labaclaw_dir).join(agent_id);
+    let agent_id_path = validated_agent_id_path(agent_id)?;
+    let agent_home = spawned_agents_dir(labaclaw_dir).join(agent_id_path);
     if !agent_home.exists() {
         return Ok(None);
     }
@@ -348,6 +351,18 @@ pub fn discover_all_status_snapshots(
 
 fn spawned_agents_dir(labaclaw_dir: &Path) -> PathBuf {
     labaclaw_dir.join("spawned-agents")
+}
+
+fn validated_agent_id_path(agent_id: &str) -> Result<&Path> {
+    let agent_id_path = Path::new(agent_id);
+    if agent_id_path.is_absolute()
+        || agent_id_path
+            .components()
+            .any(|component| !matches!(component, std::path::Component::Normal(_)))
+    {
+        anyhow::bail!("Invalid spawned agent id");
+    }
+    Ok(agent_id_path)
 }
 
 fn load_snapshot_from_agent_home(agent_home: &Path) -> Result<SpawnedAgentStatusSnapshot> {
@@ -509,10 +524,19 @@ fn parse_service_state(
         Some("suspended") => SpawnedAgentServiceState::Suspended,
         Some("failed") => SpawnedAgentServiceState::Failed,
         Some("terminated") => SpawnedAgentServiceState::Terminated,
+        _ if matches!(task_state, SpawnedAgentTaskState::Failed) => {
+            SpawnedAgentServiceState::Failed
+        }
+        _ if matches!(task_state, SpawnedAgentTaskState::Cancelled) => {
+            SpawnedAgentServiceState::Terminated
+        }
         _ if matches!(task_state, SpawnedAgentTaskState::Completed)
             && lifecycle_mode == "dedicated" =>
         {
             SpawnedAgentServiceState::Running
+        }
+        _ if matches!(task_state, SpawnedAgentTaskState::Completed) => {
+            SpawnedAgentServiceState::Terminated
         }
         _ => SpawnedAgentServiceState::Provisioning,
     }
@@ -522,4 +546,34 @@ fn parse_datetime(raw: Option<String>) -> DateTime<Utc> {
     raw.and_then(|value| DateTime::parse_from_rfc3339(&value).ok())
         .map(|value| value.with_timezone(&Utc))
         .unwrap_or_else(Utc::now)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn discover_status_snapshot_rejects_traversal_agent_ids() {
+        let labaclaw_dir = tempfile::tempdir().unwrap();
+
+        let error =
+            discover_status_snapshot(labaclaw_dir.path(), "../outside").expect_err("must reject");
+        assert!(error.to_string().contains("Invalid spawned agent id"));
+    }
+
+    #[test]
+    fn parse_service_state_inferrs_terminal_states_from_task_state() {
+        assert_eq!(
+            parse_service_state(None, "dedicated", &SpawnedAgentTaskState::Failed),
+            SpawnedAgentServiceState::Failed
+        );
+        assert_eq!(
+            parse_service_state(None, "ephemeral", &SpawnedAgentTaskState::Cancelled),
+            SpawnedAgentServiceState::Terminated
+        );
+        assert_eq!(
+            parse_service_state(None, "ephemeral", &SpawnedAgentTaskState::Completed),
+            SpawnedAgentServiceState::Terminated
+        );
+    }
 }

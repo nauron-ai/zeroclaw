@@ -11,6 +11,7 @@ ARG ZEROCLAW_CARGO_ALL_FEATURES="false"
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y \
+        cmake \
         libudev-dev \
         pkg-config \
     && rm -rf /var/lib/apt/lists/*
@@ -50,7 +51,8 @@ COPY firmware/ firmware/
 COPY templates/ templates/
 RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    export CARGO_TARGET_DIR=/app/target-final && \
+    --mount=type=cache,id=zeroclaw-target,target=/app/target,sharing=locked \
+    export CARGO_TARGET_DIR=/app/target && \
     if [ "$ZEROCLAW_CARGO_ALL_FEATURES" = "true" ]; then \
       cargo build --release --locked --all-features --bin labaclaw; \
     elif [ -n "$ZEROCLAW_CARGO_FEATURES" ]; then \
@@ -58,7 +60,7 @@ RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/regist
     else \
       cargo build --release --locked --bin labaclaw; \
     fi && \
-    cp /app/target-final/release/labaclaw /app/labaclaw && \
+    cp /app/target/release/labaclaw /app/labaclaw && \
     strip /app/labaclaw
 
 # Prepare runtime directory structure and default config inline (no extra stage)

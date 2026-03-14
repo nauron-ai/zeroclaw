@@ -268,6 +268,7 @@ whatsapp-web = ["dep:wa-rs", "dep:wa-rs-core", "dep:wa-rs-binary", "dep:wa-rs-pr
 # Keep disabled by default to preserve current runtime behavior.
 firecrawl = []
 web-fetch-html2md = ["dep:html2md"]
+# Distributed worker-plane transport depends on librdkafka's cmake build path.
 worker-plane-distributed = ["dep:rdkafka", "dep:object_store"]
 
 [profile.release]

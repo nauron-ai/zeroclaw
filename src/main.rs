@@ -1097,6 +1097,9 @@ async fn main() -> Result<()> {
         }
 
         Commands::AgentRuntime { poll_interval_ms } => {
+            if poll_interval_ms < 250 {
+                anyhow::bail!("--poll-interval-ms must be >= 250");
+            }
             spawned_runtime::run(config, poll_interval_ms).await
         }
 

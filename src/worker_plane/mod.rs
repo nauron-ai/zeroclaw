@@ -2,7 +2,6 @@ use crate::config::WorkerPlaneConfig;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 #[cfg(feature = "worker-plane-distributed")]
@@ -82,7 +81,15 @@ pub fn worker_plane_enabled(config: &WorkerPlaneConfig) -> bool {
 }
 
 pub fn local_file_ref(path: &Path) -> String {
-    format!("file://{}", path.display())
+    let mut normalized = path.to_string_lossy().replace('\\', "/");
+    if normalized.len() >= 2
+        && normalized.as_bytes()[1] == b':'
+        && normalized.as_bytes()[0].is_ascii_alphabetic()
+        && !normalized.starts_with('/')
+    {
+        normalized.insert(0, '/');
+    }
+    format!("file://{normalized}")
 }
 
 pub fn build_artifact_refs(
@@ -236,18 +243,7 @@ pub fn distributed_spawn_plan_path(agent_home: &Path) -> PathBuf {
 }
 
 pub fn spawn_request_payload(plan: &DistributedSpawnPlan) -> serde_json::Value {
-    json!({
-        "event_id": plan.spawn_command.event_id.clone(),
-        "agent_id": plan.spawn_command.agent_id.clone(),
-        "owner_agent_id": plan.spawn_command.owner_agent_id.clone(),
-        "spec_ref": plan.spawn_command.spec_ref.clone(),
-        "bootstrap_ref": plan.spawn_command.bootstrap_ref.clone(),
-        "lifecycle_mode": plan.spawn_command.lifecycle_mode.clone(),
-        "task_profile": plan.spawn_command.task_profile.clone(),
-        "requested_at": plan.spawn_command.requested_at.clone(),
-        "delivery_backend": plan.spawn_command.delivery_backend.clone(),
-        "worker_namespace": plan.spawn_command.worker_namespace.clone(),
-    })
+    serde_json::to_value(&plan.spawn_command).expect("serialize spawn_command")
 }
 
 pub async fn upload_bytes_to_artifact_ref(
@@ -263,7 +259,8 @@ pub async fn upload_bytes_to_artifact_ref(
 
     #[cfg(feature = "worker-plane-distributed")]
     {
-        let (_bucket, key) = parse_s3_uri(artifact_ref)?;
+        let (bucket, key) = parse_s3_uri(artifact_ref)?;
+        ensure_bucket_matches_config(config, &bucket)?;
         let store = build_artifact_store(config)?;
         store
             .put(&ObjectStorePath::from(key), bytes.into())
@@ -285,7 +282,8 @@ pub async fn download_bytes_from_artifact_ref(
 
     #[cfg(feature = "worker-plane-distributed")]
     {
-        let (_, key) = parse_s3_uri(artifact_ref)?;
+        let (bucket, key) = parse_s3_uri(artifact_ref)?;
+        ensure_bucket_matches_config(config, &bucket)?;
         let store = build_artifact_store(config)?;
         let bytes = store
             .get(&ObjectStorePath::from(key))
@@ -429,12 +427,23 @@ pub fn summarize_text_for_event(text: &str) -> String {
         .map(str::trim)
         .find(|line| !line.is_empty())
         .unwrap_or_default();
-    let mut summary = first_non_empty.to_string();
-    if summary.len() > 280 {
-        summary.truncate(277);
-        summary.push_str("...");
+    if first_non_empty.chars().count() <= 280 {
+        return first_non_empty.to_string();
     }
+    let mut summary = first_non_empty.chars().take(277).collect::<String>();
+    summary.push_str("...");
     summary
+}
+
+fn ensure_bucket_matches_config(config: &WorkerPlaneConfig, bucket: &str) -> Result<()> {
+    if bucket != config.artifacts.bucket {
+        anyhow::bail!(
+            "Artifact ref bucket '{}' does not match configured bucket '{}'",
+            bucket,
+            config.artifacts.bucket
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -467,6 +476,20 @@ mod tests {
     fn summarize_text_picks_first_meaningful_line() {
         let summary = summarize_text_for_event("\n\nRESULT FOR ORCHESTRATOR\n30.0% margin");
         assert_eq!(summary, "RESULT FOR ORCHESTRATOR");
+    }
+
+    #[test]
+    fn local_file_ref_normalizes_windows_style_paths() {
+        let file_ref = local_file_ref(Path::new(r"C:\tmp\agent\result.md"));
+        assert_eq!(file_ref, "file:///C:/tmp/agent/result.md");
+    }
+
+    #[test]
+    fn summarize_text_handles_multibyte_without_panicking() {
+        let text = format!("{}\nsecondary", "ż".repeat(400));
+        let summary = summarize_text_for_event(&text);
+        assert!(summary.ends_with("..."));
+        assert!(summary.chars().count() <= 280);
     }
 
     #[test]

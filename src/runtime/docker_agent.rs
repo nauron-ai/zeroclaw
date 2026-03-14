@@ -41,7 +41,12 @@ impl DockerAgentSpawner {
     }
 
     fn validate_host_path(&self, path: &Path) -> Result<PathBuf> {
-        let resolved = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let resolved = path.canonicalize().with_context(|| {
+            format!(
+                "Host path {} does not exist or is inaccessible",
+                path.display()
+            )
+        })?;
         if !resolved.is_absolute() {
             anyhow::bail!(
                 "Docker agent spawner requires an absolute path, got {}",
@@ -178,7 +183,19 @@ impl DockerAgentSpawner {
             .context("Failed to inspect spawned agent container")?;
 
         if !output.status.success() {
-            return Ok(None);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let trimmed = stderr.trim();
+            if trimmed.contains("No such object")
+                || trimmed.contains("No such container")
+                || trimmed.contains("not found")
+            {
+                return Ok(None);
+            }
+            anyhow::bail!(
+                "Failed to inspect spawned agent container '{}': {}",
+                container_name,
+                trimmed
+            );
         }
 
         let raw = String::from_utf8_lossy(&output.stdout);
@@ -299,5 +316,26 @@ mod tests {
 
         let result = spawner.build_spawn_command(&request);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn spawn_builder_rejects_missing_relative_config_dir() {
+        let spawner = test_spawner();
+        let request = DockerAgentSpawnRequest {
+            container_name: "agent-missing".into(),
+            image: "ghcr.io/nauron-ai/labaclaw:dev".into(),
+            host_config_dir: PathBuf::from("./does-not-exist"),
+            container_config_dir: "/agent".into(),
+            workspace_mounts: Vec::new(),
+            env: HashMap::new(),
+            labels: HashMap::new(),
+        };
+
+        let error = spawner
+            .build_spawn_command(&request)
+            .expect_err("must reject");
+        assert!(error
+            .to_string()
+            .contains("Host path ./does-not-exist does not exist or is inaccessible"));
     }
 }

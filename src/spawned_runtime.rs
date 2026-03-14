@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 use tokio::fs;
+use tokio::signal;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
@@ -134,6 +135,14 @@ pub async fn run(config: Config, poll_interval_ms: u64) -> Result<()> {
     let poll = Duration::from_millis(poll_interval_ms.max(250));
 
     loop {
+        if shutdown_requested().await {
+            tracing::info!("Shutdown signal received, exiting spawned agent runtime");
+            state.lifecycle_status = "terminated".into();
+            refresh_heartbeat(&mut state);
+            persist_state(&state_path, &state).await?;
+            return Ok(());
+        }
+
         if let Some((request, active_path)) = take_request(&agent_home).await? {
             process_request(
                 &config,
@@ -150,7 +159,16 @@ pub async fn run(config: Config, poll_interval_ms: u64) -> Result<()> {
             }
             refresh_heartbeat(&mut state);
             persist_state(&state_path, &state).await?;
-            sleep(poll).await;
+            tokio::select! {
+                () = shutdown_signal() => {
+                    tracing::info!("Shutdown signal received while idle, exiting spawned agent runtime");
+                    state.lifecycle_status = "terminated".into();
+                    refresh_heartbeat(&mut state);
+                    persist_state(&state_path, &state).await?;
+                    return Ok(());
+                }
+                () = sleep(poll) => {}
+            }
         }
     }
 }
@@ -167,9 +185,6 @@ async fn take_request(agent_home: &Path) -> Result<Option<(SpawnedAgentTaskReque
         return Ok(None);
     }
 
-    if active.exists() {
-        let _ = fs::remove_file(&active).await;
-    }
     fs::rename(&pending, &active)
         .await
         .with_context(|| format!("Failed to move {} into active state", pending.display()))?;
@@ -311,6 +326,28 @@ fn refresh_heartbeat(state: &mut SpawnedAgentRuntimeState) {
     let now = Utc::now().to_rfc3339();
     state.updated_at = now.clone();
     state.last_heartbeat_at = now;
+}
+
+async fn shutdown_requested() -> bool {
+    tokio::select! {
+        () = shutdown_signal() => true,
+        else => false,
+    }
+}
+
+async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        if let Ok(mut terminate) = signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            tokio::select! {
+                _ = signal::ctrl_c() => {}
+                _ = terminate.recv() => {}
+            }
+            return;
+        }
+    }
+
+    let _ = signal::ctrl_c().await;
 }
 
 fn agent_id_from_home(agent_home: &Path) -> String {

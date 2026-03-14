@@ -51,6 +51,17 @@ mod tests {
     }
 
     #[test]
+    fn reexported_worker_plane_configs_are_constructible() {
+        let worker_plane = WorkerPlaneConfig::default();
+        let redpanda = WorkerPlaneRedpandaConfig::default();
+        let artifacts = WorkerPlaneArtifactsConfig::default();
+        let kubernetes = WorkerPlaneKubernetesConfig::default();
+
+        assert!(!worker_plane.enabled);
+        let _ = (redpanda, artifacts, kubernetes);
+    }
+
+    #[test]
     fn reexported_channel_configs_are_constructible() {
         let telegram = TelegramConfig {
             bot_token: "token".into(),

@@ -8,6 +8,7 @@ use directories::UserDirs;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::{OnceLock, RwLock};
@@ -3978,7 +3979,7 @@ pub struct WorkerPlaneRedpandaConfig {
 }
 
 /// RustFS/S3 layout for worker-plane artifacts.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
 pub struct WorkerPlaneArtifactsConfig {
     /// RustFS S3 endpoint reachable from `claw`.
     #[serde(default)]
@@ -4007,6 +4008,26 @@ pub struct WorkerPlaneArtifactsConfig {
     /// Optional secret key for the artifact store.
     #[serde(default)]
     pub secret_key: Option<String>,
+}
+
+impl fmt::Debug for WorkerPlaneArtifactsConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WorkerPlaneArtifactsConfig")
+            .field("endpoint", &self.endpoint)
+            .field("region", &self.region)
+            .field("force_path_style", &self.force_path_style)
+            .field("bucket", &self.bucket)
+            .field("prefix", &self.prefix)
+            .field(
+                "access_key",
+                &self.access_key.as_ref().map(|_| "<redacted>"),
+            )
+            .field(
+                "secret_key",
+                &self.secret_key.as_ref().map(|_| "<redacted>"),
+            )
+            .finish()
+    }
 }
 
 /// Kubernetes placement metadata for dedicated worker Deployments.
@@ -4152,6 +4173,78 @@ fn default_runtime_kind() -> String {
 
 fn default_worker_plane_mode() -> String {
     "local_docker".into()
+}
+
+fn is_valid_worker_plane_mode(mode: &str) -> bool {
+    matches!(mode.trim(), "local_docker" | "redpanda_k8s")
+}
+
+fn validate_worker_plane_config(config: &WorkerPlaneConfig) -> Result<()> {
+    if !config.enabled {
+        return Ok(());
+    }
+
+    let mode = config.mode.trim();
+    if !is_valid_worker_plane_mode(mode) {
+        anyhow::bail!(
+            "worker_plane.mode must be one of: local_docker, redpanda_k8s (got '{mode}')"
+        );
+    }
+
+    if mode == "redpanda_k8s" {
+        if config
+            .redpanda
+            .brokers
+            .iter()
+            .all(|broker| broker.trim().is_empty())
+        {
+            anyhow::bail!(
+                "worker_plane.redpanda.brokers must contain at least one broker when worker_plane.mode='redpanda_k8s'"
+            );
+        }
+        for (field_name, value) in [
+            (
+                "worker_plane.redpanda.command_topic",
+                config.redpanda.command_topic.trim(),
+            ),
+            (
+                "worker_plane.redpanda.event_topic",
+                config.redpanda.event_topic.trim(),
+            ),
+            (
+                "worker_plane.redpanda.heartbeat_topic",
+                config.redpanda.heartbeat_topic.trim(),
+            ),
+            (
+                "worker_plane.redpanda.projection_consumer_group",
+                config.redpanda.projection_consumer_group.trim(),
+            ),
+            (
+                "worker_plane.artifacts.bucket",
+                config.artifacts.bucket.trim(),
+            ),
+            (
+                "worker_plane.artifacts.region",
+                config.artifacts.region.trim(),
+            ),
+            (
+                "worker_plane.kubernetes.namespace",
+                config.kubernetes.namespace.trim(),
+            ),
+            (
+                "worker_plane.kubernetes.service_account",
+                config.kubernetes.service_account.trim(),
+            ),
+        ] {
+            if value.is_empty() {
+                anyhow::bail!(
+                    "{field_name} must not be empty when worker_plane.mode='redpanda_k8s'"
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn default_worker_plane_command_topic() -> String {
@@ -8158,6 +8251,16 @@ impl Config {
                 &mut config.browser.computer_use.api_key,
                 "config.browser.computer_use.api_key",
             )?;
+            decrypt_optional_secret(
+                &store,
+                &mut config.worker_plane.artifacts.access_key,
+                "config.worker_plane.artifacts.access_key",
+            )?;
+            decrypt_optional_secret(
+                &store,
+                &mut config.worker_plane.artifacts.secret_key,
+                "config.worker_plane.artifacts.secret_key",
+            )?;
 
             decrypt_optional_secret(
                 &store,
@@ -8542,6 +8645,7 @@ impl Config {
             anyhow::bail!("gateway.host must not be empty");
         }
         normalize_dashboard_origin_list(&self.gateway.dashboard_allowed_origins)?;
+        validate_worker_plane_config(&self.worker_plane)?;
 
         // Reliability
         let configured_fallbacks = self
@@ -10147,6 +10251,16 @@ impl Config {
             &mut config_to_save.browser.computer_use.api_key,
             "config.browser.computer_use.api_key",
         )?;
+        encrypt_optional_secret(
+            &store,
+            &mut config_to_save.worker_plane.artifacts.access_key,
+            "config.worker_plane.artifacts.access_key",
+        )?;
+        encrypt_optional_secret(
+            &store,
+            &mut config_to_save.worker_plane.artifacts.secret_key,
+            "config.worker_plane.artifacts.secret_key",
+        )?;
 
         encrypt_optional_secret(
             &store,
@@ -10777,6 +10891,35 @@ action = "require_approval"
         assert!(err
             .to_string()
             .contains("autonomy.non_cli_excluded_tools contains duplicate entry"));
+    }
+
+    #[test]
+    async fn worker_plane_enabled_requires_valid_distributed_config() {
+        let mut cfg = Config::default();
+        cfg.worker_plane.enabled = true;
+        cfg.worker_plane.mode = "broken-mode".into();
+
+        let err = cfg.validate().unwrap_err();
+        assert!(err.to_string().contains("worker_plane.mode must be one of"));
+
+        cfg.worker_plane.mode = "redpanda_k8s".into();
+        cfg.worker_plane.redpanda.brokers = vec!["   ".into()];
+        cfg.worker_plane.redpanda.command_topic.clear();
+        cfg.worker_plane.kubernetes.service_account.clear();
+
+        let err = cfg.validate().unwrap_err();
+        let message = err.to_string();
+        assert!(
+            message.contains("worker_plane.redpanda.brokers")
+                || message.contains("worker_plane.redpanda.command_topic")
+                || message.contains("worker_plane.kubernetes.service_account")
+        );
+
+        cfg.worker_plane.redpanda.brokers = vec!["10.50.0.11:31092".into()];
+        cfg.worker_plane.redpanda.command_topic = "agent.command.v1".into();
+        cfg.worker_plane.kubernetes.service_account = "labaclaw-worker-plane".into();
+        cfg.validate()
+            .expect("valid worker-plane config should pass");
     }
 
     #[test]
@@ -11510,6 +11653,8 @@ denied_tools = ["shell"]
         config.proxy.https_proxy = Some("https://user:pass@proxy.internal:8443".into());
         config.proxy.all_proxy = Some("socks5://user:pass@proxy.internal:1080".into());
         config.browser.computer_use.api_key = Some("browser-credential".into());
+        config.worker_plane.artifacts.access_key = Some("rustfs-access-key".into());
+        config.worker_plane.artifacts.secret_key = Some("rustfs-secret-key".into());
         config.web_search.brave_api_key = Some("brave-credential".into());
         config.web_search.perplexity_api_key = Some("perplexity-credential".into());
         config.web_search.exa_api_key = Some("exa-credential".into());
@@ -11614,6 +11759,23 @@ denied_tools = ["shell"]
         assert_eq!(
             store.decrypt(browser_encrypted).unwrap(),
             "browser-credential"
+        );
+
+        let worker_plane_access_key = stored.worker_plane.artifacts.access_key.as_deref().unwrap();
+        assert!(crate::security::SecretStore::is_encrypted(
+            worker_plane_access_key
+        ));
+        assert_eq!(
+            store.decrypt(worker_plane_access_key).unwrap(),
+            "rustfs-access-key"
+        );
+        let worker_plane_secret_key = stored.worker_plane.artifacts.secret_key.as_deref().unwrap();
+        assert!(crate::security::SecretStore::is_encrypted(
+            worker_plane_secret_key
+        ));
+        assert_eq!(
+            store.decrypt(worker_plane_secret_key).unwrap(),
+            "rustfs-secret-key"
         );
 
         let web_search_encrypted = stored.web_search.brave_api_key.as_deref().unwrap();

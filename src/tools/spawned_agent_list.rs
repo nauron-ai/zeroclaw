@@ -69,6 +69,12 @@ impl Tool for SpawnedAgentListTool {
             }
             merged
                 .entry(snapshot.agent_id.clone())
+                .and_modify(|existing| {
+                    existing.container_id = snapshot.container_id.clone();
+                    existing.service_state = snapshot.service_state.as_str().to_string();
+                    existing.task_state = snapshot.task_state.as_str().to_string();
+                    existing.updated_at = snapshot.updated_at.to_rfc3339();
+                })
                 .or_insert_with(|| SpawnedAgentSummary {
                     agent_id: snapshot.agent_id,
                     display_name: snapshot.display_name,
@@ -77,6 +83,7 @@ impl Tool for SpawnedAgentListTool {
                     lifecycle_mode: snapshot.lifecycle_mode,
                     primary_provider: snapshot.primary_provider,
                     primary_model: snapshot.primary_model,
+                    container_id: snapshot.container_id,
                     service_state: snapshot.service_state.as_str().to_string(),
                     task_state: snapshot.task_state.as_str().to_string(),
                     started_at: snapshot.started_at.to_rfc3339(),
