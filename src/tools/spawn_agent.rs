@@ -439,7 +439,12 @@ impl Tool for SpawnAgentTool {
             slugify(&request.agent_name),
             &Uuid::new_v4().simple().to_string()[..12]
         );
-        let image = resolve_spawn_image(request.image.as_deref(), &self.root_config)?;
+        let distributed_backend = worker_plane_enabled(&self.root_config.worker_plane);
+        let image = resolve_spawn_image(
+            request.image.as_deref(),
+            &self.root_config,
+            distributed_backend,
+        )?;
         let container_name = format!("labaclaw-agent-{agent_id}");
 
         let workspace_mounts = request
@@ -565,7 +570,7 @@ impl Tool for SpawnAgentTool {
             "agent_id": agent_id,
             "status": "provisioning",
             "message": "Dedicated specialist is being created. Use spawned_agent_manage for live status.",
-            "delivery_backend": if worker_plane_enabled(&self.root_config.worker_plane) {
+            "delivery_backend": if distributed_backend {
                 "redpanda_k8s"
             } else {
                 "local_docker"
@@ -1025,7 +1030,11 @@ fn parse_request(args: &serde_json::Value, default_workspace: &Path) -> Result<S
     })
 }
 
-fn resolve_spawn_image(image_override: Option<&str>, config: &Config) -> Result<String> {
+fn resolve_spawn_image(
+    image_override: Option<&str>,
+    config: &Config,
+    distributed_backend: bool,
+) -> Result<String> {
     let image = image_override
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -1035,6 +1044,10 @@ fn resolve_spawn_image(image_override: Option<&str>, config: &Config) -> Result<
 
     if image.is_empty() {
         anyhow::bail!("Spawned agent image is empty. Set runtime.docker.image or pass image.");
+    }
+
+    if distributed_backend && image == "alpine:3.20" {
+        return Ok("worker-plane-managed".into());
     }
 
     if image == "alpine:3.20" {
@@ -2366,9 +2379,18 @@ mod tests {
         let mut config = Config::default();
         config.runtime.docker.image = "labaclaw:spawn-e2e-real-v2".into();
 
-        let resolved = resolve_spawn_image(Some("example:latest"), &config).unwrap();
+        let resolved = resolve_spawn_image(Some("example:latest"), &config, false).unwrap();
 
         assert_eq!(resolved, "labaclaw:spawn-e2e-real-v2");
+    }
+
+    #[test]
+    fn resolve_spawn_image_allows_default_runtime_image_for_distributed_worker_plane() {
+        let config = Config::default();
+
+        let resolved = resolve_spawn_image(None, &config, true).unwrap();
+
+        assert_eq!(resolved, "worker-plane-managed");
     }
 
     #[test]
